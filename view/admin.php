@@ -78,8 +78,83 @@ class Admin {
 			);
 		}
 
-		// HTML - Settings will render here automatically, then we add manual sync
+		// Get settings to render manually
+		$settings = $this->addSettings([]);
+
+		// Render settings
 		?>
+		<table class="form-table">
+			<?php
+			foreach ($settings as $setting) {
+				if ($setting['type'] === 'title') {
+					?>
+					<tr>
+						<th colspan="2">
+							<h2><?php echo esc_html($setting['name']); ?></h2>
+							<?php if (!empty($setting['desc'])) { ?>
+								<p class="description"><?php echo $setting['desc']; ?></p>
+							<?php } ?>
+						</th>
+					</tr>
+					<?php
+				} elseif ($setting['type'] === 'sectionend') {
+					// Just spacing
+				} elseif ($setting['type'] === 'radio_inline') {
+					$value = give_get_option($setting['id'], $setting['default']);
+					?>
+					<tr>
+						<th scope="row">
+							<label><?php echo esc_html($setting['name']); ?></label>
+						</th>
+						<td>
+							<?php foreach ($setting['options'] as $key => $label) { ?>
+								<label style="margin-right: 15px;">
+									<input type="radio" name="<?php echo esc_attr($setting['id']); ?>" value="<?php echo esc_attr($key); ?>" <?php checked($value, $key); ?>>
+									<?php echo esc_html($label); ?>
+								</label>
+							<?php } ?>
+							<?php if (!empty($setting['desc'])) { ?>
+								<p class="description"><?php echo $setting['desc']; ?></p>
+							<?php } ?>
+						</td>
+					</tr>
+					<?php
+				} elseif ($setting['type'] === 'select') {
+					$value = give_get_option($setting['id'], $setting['default']);
+					?>
+					<tr>
+						<th scope="row">
+							<label for="<?php echo esc_attr($setting['id']); ?>"><?php echo esc_html($setting['name']); ?></label>
+						</th>
+						<td>
+							<select name="<?php echo esc_attr($setting['id']); ?>" id="<?php echo esc_attr($setting['id']); ?>">
+								<?php foreach ($setting['options'] as $key => $label) { ?>
+									<option value="<?php echo esc_attr($key); ?>" <?php selected($value, $key); ?>><?php echo esc_html($label); ?></option>
+								<?php } ?>
+							</select>
+							<?php if (!empty($setting['desc'])) { ?>
+								<p class="description"><?php echo $setting['desc']; ?></p>
+							<?php } ?>
+						</td>
+					</tr>
+					<?php
+				} elseif ($setting['type'] === 'descriptive_text') {
+					?>
+					<tr>
+						<th scope="row">
+							<label><?php echo esc_html($setting['name']); ?></label>
+						</th>
+						<td>
+							<?php echo $setting['desc']; ?>
+						</td>
+					</tr>
+					<?php
+				}
+			}
+			?>
+		</table>
+
+		<!-- Manual Sync Card -->
 	    <div class="card" id="civivipgive-sync-card" style="margin-top: 20px;">
 	        <h2 class="title">
 	        	<?= __('CiviCRM Integration Manual Sync', 'civivip-give'); ?>
