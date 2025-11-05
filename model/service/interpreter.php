@@ -89,7 +89,15 @@ class Interpreter {
 	 */
 	public static function paymentInstrument($gateway)
 	{
-		// Common GiveWP gateway to CiviCRM payment instrument mappings
+		// Check if custom mapping exists in settings
+		$setting_key = 'civivipgive_payment_map_' . $gateway;
+		$custom_mapping = give_get_option($setting_key);
+
+		if (!empty($custom_mapping)) {
+			return $custom_mapping;
+		}
+
+		// Default GiveWP gateway to CiviCRM payment instrument mappings
 		$dictionary = [
 			'stripe' => 'Credit Card',
 			'stripe_ach' => 'EFT',
@@ -114,6 +122,6 @@ class Interpreter {
 		];
 
 		// Return mapped value or default to 'Credit Card' if gateway not recognized
-		return isset($dictionary[$gateway]) ? $dictionary[$gateway] : 'Credit Card';
+		return $dictionary[$gateway] ?? 'Credit Card';
 	}
 }

@@ -27,13 +27,21 @@ class Contact {
 	 * @since 	1.0
 	 *
 	 * @param 	array 	$donor 	a processed Give donation's "donor info" element
-	 * 
+	 *
 	 * @return 	int|string
 	 */
 	public function store(array $donor)
 	{
+		// Extract billing address if present (custom field, not part of Contact API)
+		$billing_address = $donor['_billing_address'] ?? [];
+		unset($donor['_billing_address']);
+
 		$result_exists = $this->fetch($donor);
 		if ($result_exists !== 'Failed to fetch') {
+			// If contact exists and we have billing address, update it
+			if (!empty($billing_address)) {
+				$this->storeAddress($result_exists, $billing_address);
+			}
 			return $result_exists;
 		}
 
@@ -48,10 +56,76 @@ class Contact {
 			Debug::log($e->getMessage() );	// unreliable
 		}
 		if(is_array($result) && isset($result['id']) ) {
+			// If we created/updated contact and have billing address, store it
+			if (!empty($billing_address)) {
+				$this->storeAddress($result['id'], $billing_address);
+			}
 			return $result['id'];
 		}
 
 		return 'Failed to store'; Debug::err_log('Give CiviCRM failed to store:' . var_export($donor, true) );
+	}
+
+	/**
+	 * Store or update billing address for a contact.
+	 *
+	 * @since 	0.4.0
+	 *
+	 * @param 	int 	$contact_id 		CiviCRM contact ID
+	 * @param 	array 	$billing_address 	Address data
+	 *
+	 * @return 	int|string
+	 */
+	protected function storeAddress($contact_id, array $billing_address)
+	{
+		if (empty($billing_address)) {
+			return 'No address data';
+		}
+
+		// Check if billing address already exists for this contact
+		try {
+			civicrm_initialize();
+			$existing_address = civicrm_api3(
+				'Address',
+				'get',
+				[
+					'contact_id' => $contact_id,
+					'location_type_id' => 'Billing',
+				]
+			);
+		} catch (\CiviCRM_API3_Exception $e) {
+			Debug::log($e->getMessage());
+		}
+
+		// Prepare address data
+		$address_data = $billing_address + [
+			'contact_id' => $contact_id,
+			'location_type_id' => 'Billing',
+		];
+
+		// If address exists, add ID to update it
+		if (isset($existing_address['id']) && $existing_address['count'] > 0) {
+			$address_data['id'] = $existing_address['id'];
+		}
+
+		// Create or update address
+		try {
+			civicrm_initialize();
+			$result = civicrm_api3(
+				'Address',
+				'create',
+				$address_data
+			);
+		} catch (\CiviCRM_API3_Exception $e) {
+			Debug::log($e->getMessage());
+			return 'Failed to store address';
+		}
+
+		if (is_array($result) && isset($result['id'])) {
+			return $result['id'];
+		}
+
+		return 'Failed to store address';
 	}
 
 	/**

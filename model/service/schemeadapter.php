@@ -46,6 +46,22 @@ class SchemeAdapter {
 		if ( empty( $payment_meta['_give_payment_form_title'] ) ) {
 			$payment_meta['_give_payment_form_title'] = 'ID: ' . $payment_meta['_give_payment_form_id'];
 		}
+		// Extract billing address from payment meta if sync is enabled
+		$billing_address = [];
+		$sync_addresses = give_get_option('civivipgive_sync_addresses', 'enabled');
+		if ($sync_addresses === 'enabled' && !empty($payment_meta['_give_donor_billing_address1'])) {
+			$billing_address = [
+				'street_address'	=> $payment_meta['_give_donor_billing_address1'] ?? '',
+				'supplemental_address_1' => $payment_meta['_give_donor_billing_address2'] ?? '',
+				'city'				=> $payment_meta['_give_donor_billing_city'] ?? '',
+				'state_province'	=> $payment_meta['_give_donor_billing_state'] ?? '',
+				'postal_code'		=> $payment_meta['_give_donor_billing_zip'] ?? '',
+				'country'			=> $payment_meta['_give_donor_billing_country'] ?? '',
+			];
+			// Remove empty values
+			$billing_address = array_filter($billing_address);
+		}
+
 		return [
 			// Donor related
 			'donor info' => [
@@ -56,6 +72,7 @@ class SchemeAdapter {
 				'last_name'					=> $user_info['last_name'] ?? '',
 				'source'					=> 'Give',
 				'_wp_user_id'				=> $payment->user_id ?? 0,
+				'_billing_address'			=> $billing_address,	// Custom field for our use
 			],
 			// For use by controllers
 			'meta' => [

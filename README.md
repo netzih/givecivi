@@ -1,5 +1,11 @@
 ### Changelog
 
+#### Version 0.5.0
+- [X] **Billing Address Sync**: Automatically sync billing addresses from GiveWP to CiviCRM contacts
+- [X] **Admin Settings Page**: New comprehensive settings interface with multiple sections
+- [X] **Payment Method Mappings**: Customizable payment gateway to payment instrument mappings
+- [X] **Settings Toggle**: Enable/disable address sync via admin settings
+
 #### Version 0.4.0
 - [X] Pass actual payment methods from GiveWP to CiviCRM (instead of "See Give")
 - [X] Fixed critical bug in subscription fetching logic (assignment vs comparison)
@@ -16,10 +22,12 @@
 - [X] Improve logging, errors and user feedback
 - [X] Pass actual payment methods instead of "See Give"
 - [X] Ensure recurring donations sync properly
+- [X] Capture billing address
+- [X] Add admin settings page for payment method mappings
 
 
 ### Future Features?
 
-- [ ] Capture billing address
-- [ ] Capture notes
-- [ ] Add admin settings page for payment method mappings
+- [ ] Capture donor notes from Give to CiviCRM
+- [ ] Support for custom field mappings
+- [ ] Bulk address update tool
