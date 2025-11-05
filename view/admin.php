@@ -22,7 +22,6 @@ class Admin {
 	function __construct()
 	{
 		add_filter('give-settings_tabs_array', [$this, 'addOurTab']);
-		add_filter('give_get_sections_civivip-give', [$this, 'addSettingsSections']);
 		add_filter('give_get_settings_civivip-give', [$this, 'addSettings']);
 		add_action('wp_ajax_civivipgive-sync', [$this, 'blastOff']);
 	}
@@ -41,23 +40,6 @@ class Admin {
 	}
 
 	/**
-	 * Add sections to our settings tab.
-	 *
-	 * @since 	0.4.0
-	 *
-	 * @param 	array 	$sections
-	 *
-	 * @return 	array
-	 */
-	public function addSettingsSections($sections)
-	{
-		$sections['general'] = __('General Settings', 'civivip-give');
-		$sections['payment-methods'] = __('Payment Method Mappings', 'civivip-give');
-		$sections['manual-sync'] = __('Manual Sync', 'civivip-give');
-		return $sections;
-	}
-
-	/**
 	 * Add settings fields.
 	 *
 	 * @since 	0.4.0
@@ -68,22 +50,13 @@ class Admin {
 	 */
 	public function addSettings($settings)
 	{
-		$current_section = give_get_current_setting_section();
+		$all_settings = array_merge(
+			$this->getGeneralSettings(),
+			$this->getPaymentMethodSettings(),
+			$this->getManualSyncSettings()
+		);
 
-		switch ($current_section) {
-			case 'payment-methods':
-				$settings = $this->getPaymentMethodSettings();
-				break;
-			case 'manual-sync':
-				$settings = $this->getManualSyncSettings();
-				break;
-			case 'general':
-			default:
-				$settings = $this->getGeneralSettings();
-				break;
-		}
-
-		return $settings;
+		return $all_settings;
 	}
 
 	/**
