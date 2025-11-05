@@ -127,7 +127,14 @@ jQuery(function ($) { 'use strict';
 		if (permission) {
 			$('#civivipgive-sync-progressbar').progressbar({value: false});    // Set progress bar to make like a barberpole.
 			$('.progress-label').text('Preparing to sync . . .');
-			civivipgiveTimer('start');
+
+			// Start sync via Ajax
+			civivipgiveSyncViaAjaxPost();
+
+			// Start polling after a brief delay to allow the progress file to be created
+			setTimeout(function() {
+				civivipgiveTimer('start');
+			}, 1000);
 		} else {
 			civivipgiveShowNotice('no permission');
 		}
