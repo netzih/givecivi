@@ -98,13 +98,33 @@ class Admin {
 	 */
 	public function addSettings($settings)
 	{
-		$all_settings = array_merge(
-			$this->getGeneralSettings(),
-			$this->getPaymentMethodSettings(),
-			$this->getManualSyncSettings()
-		);
+		// Start with a simple test
+		$settings[] = [
+			'id' => 'civivipgive_test',
+			'name' => __('CiviCRM Integration Settings', 'civivip-give'),
+			'desc' => __('Configure how GiveWP syncs with CiviCRM.', 'civivip-give'),
+			'type' => 'title',
+		];
 
-		return $all_settings;
+		// General Settings
+		$settings[] = [
+			'name' => __('Enable Address Sync', 'civivip-give'),
+			'desc' => __('Sync billing addresses from Give to CiviCRM contacts', 'civivip-give'),
+			'id' => 'civivipgive_sync_addresses',
+			'type' => 'radio_inline',
+			'default' => 'enabled',
+			'options' => [
+				'enabled' => __('Enabled', 'civivip-give'),
+				'disabled' => __('Disabled', 'civivip-give'),
+			],
+		];
+
+		$settings[] = [
+			'id' => 'civivipgive_test',
+			'type' => 'sectionend',
+		];
+
+		return $settings;
 	}
 
 	/**
