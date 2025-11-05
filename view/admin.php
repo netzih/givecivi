@@ -98,16 +98,14 @@ class Admin {
 	 */
 	public function addSettings($settings)
 	{
-		// Start with a simple test
-		$settings[] = [
-			'id' => 'civivipgive_test',
-			'name' => __('CiviCRM Integration Settings', 'civivip-give'),
-			'desc' => __('Configure how GiveWP syncs with CiviCRM.', 'civivip-give'),
+		// General Settings Section
+		$settings['civivipgive_general_title'] = [
+			'id' => 'civivipgive_general_title',
+			'name' => __('General Settings', 'civivip-give'),
 			'type' => 'title',
 		];
 
-		// General Settings
-		$settings[] = [
+		$settings['civivipgive_sync_addresses'] = [
 			'name' => __('Enable Address Sync', 'civivip-give'),
 			'desc' => __('Sync billing addresses from Give to CiviCRM contacts', 'civivip-give'),
 			'id' => 'civivipgive_sync_addresses',
@@ -119,8 +117,66 @@ class Admin {
 			],
 		];
 
-		$settings[] = [
-			'id' => 'civivipgive_test',
+		$settings['civivipgive_general_end'] = [
+			'id' => 'civivipgive_general_end',
+			'type' => 'sectionend',
+		];
+
+		// Payment Method Mappings
+		$settings['civivipgive_payment_title'] = [
+			'id' => 'civivipgive_payment_title',
+			'name' => __('Payment Method Mappings', 'civivip-give'),
+			'desc' => __('Map GiveWP payment gateways to CiviCRM payment instruments.', 'civivip-give'),
+			'type' => 'title',
+		];
+
+		$civicrm_instruments = [
+			'Credit Card' => 'Credit Card',
+			'Debit Card' => 'Debit Card',
+			'Cash' => 'Cash',
+			'Check' => 'Check',
+			'EFT' => 'EFT',
+		];
+
+		$gateways = [
+			'stripe' => 'Stripe',
+			'paypal' => 'PayPal',
+			'offline' => 'Offline Donations',
+			'manual' => 'Manual',
+		];
+
+		foreach ($gateways as $gateway_id => $gateway_name) {
+			$settings['civivipgive_payment_map_' . $gateway_id] = [
+				'name' => $gateway_name,
+				'desc' => sprintf(__('CiviCRM payment instrument for %s', 'civivip-give'), $gateway_name),
+				'id' => 'civivipgive_payment_map_' . $gateway_id,
+				'type' => 'select',
+				'options' => $civicrm_instruments,
+				'default' => ($gateway_id === 'offline') ? 'Check' : 'Credit Card',
+			];
+		}
+
+		$settings['civivipgive_payment_end'] = [
+			'id' => 'civivipgive_payment_end',
+			'type' => 'sectionend',
+		];
+
+		// Manual Sync
+		$settings['civivipgive_sync_title'] = [
+			'id' => 'civivipgive_sync_title',
+			'name' => __('Manual Synchronization', 'civivip-give'),
+			'type' => 'title',
+		];
+
+		$settings['civivipgive_sync_button'] = [
+			'name' => __('Sync Now', 'civivip-give'),
+			'desc' => __('Click to manually synchronize all Give donations to CiviCRM.<br><br><button type="button" class="button button-primary" id="civivipgive-sync-submit">Sync Now</button><div id="civivipgive-sync-progressbar" style="margin-top:15px;display:none;"></div>', 'civivip-give'),
+			'id' => 'civivipgive_sync_button',
+			'type' => 'descriptive_text',
+		];
+
+		$settings['civivipgive_sync_end'] = [
+			'id' => 'civivipgive_sync_end',
 			'type' => 'sectionend',
 		];
 
