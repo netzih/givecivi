@@ -1,0 +1,26 @@
+form {
+	position: relative;
+}
+label {
+	display: block;
+}
+
+#civivipgive-sync-submit {
+	margin-bottom: 10px;
+	margin-top: 10px;
+}
+
+.progress-label {
+	color: white;
+	font-weight: bold;
+	position: absolute;
+	text-align: center;
+	text-shadow: -1px 0 dimgray, 0 1px dimgray, 1px 0 dimgray, 0 -1px dimgray;
+	top: 4px;
+	width: 100%;
+	z-index: 2;
+}
+
+.ui-progressbar {
+	position: relative;
+}
