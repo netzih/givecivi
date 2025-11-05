@@ -24,6 +24,7 @@ class Admin {
 		add_filter('give-settings_tabs_array', [$this, 'addOurTab']);
 		add_action('give-settings_sections_civivip-give_page', [$this, 'displayTabPage']);
 		add_filter('give_get_settings_civivip-give', [$this, 'addSettings']);
+		add_action('admin_init', [$this, 'saveSettings']);
 		add_action('wp_ajax_civivipgive-sync', [$this, 'blastOff']);
 	}
 
@@ -38,6 +39,48 @@ class Admin {
 	{
 		$tabs['civivip-give'] = 'CiviCRM Integration';
 		return $tabs;
+	}
+
+	/**
+	 * Save settings.
+	 *
+	 * @since 	0.5.0
+	 */
+	public function saveSettings()
+	{
+		// Check if we're on the right page
+		if (!isset($_GET['page']) || $_GET['page'] !== 'give-settings') {
+			return;
+		}
+		if (!isset($_GET['tab']) || $_GET['tab'] !== 'civivip-give') {
+			return;
+		}
+
+		// Check if form was submitted
+		if (!isset($_POST['civivipgive_save_settings'])) {
+			return;
+		}
+
+		// Verify nonce
+		if (!isset($_POST['_wpnonce']) || !wp_verify_nonce($_POST['_wpnonce'], 'civivipgive_settings')) {
+			wp_die(__('Security check failed', 'civivip-give'));
+		}
+
+		// Save each setting
+		$settings = $this->addSettings([]);
+		foreach ($settings as $setting) {
+			if (isset($setting['id']) && isset($_POST[$setting['id']])) {
+				give_update_option($setting['id'], sanitize_text_field($_POST[$setting['id']]));
+			}
+		}
+
+		// Redirect with success message
+		wp_redirect(add_query_arg([
+			'page' => 'give-settings',
+			'tab' => 'civivip-give',
+			'settings-updated' => 'true'
+		], admin_url('admin.php')));
+		exit;
 	}
 
 	/**
@@ -78,26 +121,21 @@ class Admin {
 			);
 		}
 
-		// Handle form submission
-		if (isset($_POST['civivipgive_save_settings'])) {
-			check_admin_referer('civivipgive_settings');
-
-			$settings = $this->addSettings([]);
-			foreach ($settings as $setting) {
-				if (isset($setting['id']) && isset($_POST[$setting['id']])) {
-					give_update_option($setting['id'], sanitize_text_field($_POST[$setting['id']]));
-				}
-			}
-
-			echo '<div class="notice notice-success"><p><strong>Settings saved.</strong></p></div>';
-		}
-
 		// Get settings to render manually
 		$settings = $this->addSettings([]);
 
+		// Display success message if settings were saved
+		if (isset($_GET['settings-updated']) && $_GET['settings-updated'] === 'true') {
+			?>
+			<div class="notice notice-success is-dismissible">
+				<p><strong><?php echo __('Settings saved.', 'civivip-give'); ?></strong></p>
+			</div>
+			<?php
+		}
+
 		// Render settings form
 		?>
-		<form method="post" action="">
+		<form method="post" action="<?php echo admin_url('admin.php?page=give-settings&tab=civivip-give'); ?>">
 			<?php wp_nonce_field('civivipgive_settings'); ?>
 			<table class="form-table">
 				<?php
