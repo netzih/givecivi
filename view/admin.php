@@ -24,7 +24,6 @@ class Admin {
 		add_filter('give-settings_tabs_array', [$this, 'addOurTab']);
 		add_filter('give_get_sections_civivip-give', [$this, 'addSettingsSections']);
 		add_filter('give_get_settings_civivip-give', [$this, 'addSettings']);
-		add_action('give_settings_give_manual_sync_html', [$this, 'renderManualSyncField']);
 		add_action('wp_ajax_civivipgive-sync', [$this, 'blastOff']);
 	}
 
@@ -238,16 +237,20 @@ class Admin {
 	 */
 	protected function getManualSyncSettings()
 	{
+		// Enqueue assets
+		$this->enqueueManualSyncAssets();
+
 		return [
 			[
 				'id' => 'civivipgive_manual_sync_settings',
 				'type' => 'title',
+				'title' => __('Manual Synchronization', 'civivip-give'),
 			],
 			[
-				'name' => __('Manual Synchronization', 'civivip-give'),
-				'desc' => '',
-				'id' => 'civivipgive_manual_sync_html',
-				'type' => 'give_manual_sync_html',
+				'name' => __('Sync Donations', 'civivip-give'),
+				'desc' => $this->getManualSyncHTML(),
+				'id' => 'civivipgive_manual_sync_desc',
+				'type' => 'descriptive_text',
 			],
 			[
 				'id' => 'civivipgive_manual_sync_settings',
@@ -257,15 +260,43 @@ class Admin {
 	}
 
 	/**
-	 * Render manual sync field in settings.
+	 * Get manual sync HTML.
 	 *
 	 * @since 	0.5.0
 	 *
-	 * @param 	array 	$value
+	 * @return 	string
 	 */
-	public function renderManualSyncField($value)
+	protected function getManualSyncHTML()
 	{
-		// CSS and JavaScript
+		ob_start();
+		?>
+		<div style="margin-top: 10px;">
+			<p><?php echo __('Click to manually synchronize all Give donations to CiviCRM.', 'civivip-give'); ?></p>
+			<p>
+				<input
+					name="civivipgive-sync-submit"
+					id="civivipgive-sync-submit"
+					class="button button-primary"
+					type="button"
+					value="<?php echo esc_attr(__('Sync Now', 'civivip-give')); ?>"
+				>
+			</p>
+			<!-- progressbar scaffold for jQuery -->
+			<div id="civivipgive-sync-progressbar" role="progressbar" style="margin-top: 15px;">
+				<div id="progress-label" class="progress-label"></div>
+			</div>
+		</div>
+		<?php
+		return ob_get_clean();
+	}
+
+	/**
+	 * Enqueue manual sync assets.
+	 *
+	 * @since 	0.5.0
+	 */
+	protected function enqueueManualSyncAssets()
+	{
 		$wp_scripts = new \WP_Scripts;
 		wp_enqueue_style(
 			'civivipgive-progressbar',
@@ -286,41 +317,9 @@ class Admin {
 			'civivipgive-admin-tab-sync',
 			'civivipgive_jsparams', [
 				'tempprogfileurl' => trailingslashit(CIVIVIPGIVE_TEMPDIR_URL) . 'civivipgive_percent.tmp',
-				'permission' => current_user_can('administrator'),	//'edit_contributions')
+				'permission' => current_user_can('administrator'),
 			]
 		);
-		?>
-		<tr valign="top">
-			<th scope="row" class="titledesc">
-				<label for="<?php echo esc_attr($value['id']); ?>">
-					<?php echo esc_html($value['name']); ?>
-				</label>
-			</th>
-			<td class="forminp forminp-<?php echo sanitize_title($value['type']); ?>">
-				<div class="card" id="civivipgive-sync-card" style="max-width: none;">
-					<p class="description">
-						<?php echo __('Click to manually synchronize Give donations to CiviContribute.', 'civivip-give'); ?>
-					</p>
-					<p>
-						<input
-							name="civivipgive-sync-submit"
-							id="civivipgive-sync-submit"
-							class="button button-primary"
-							type="button"
-							value="<?php echo esc_attr(__('Sync Now', 'civivip-give')); ?>"
-						>
-					</p>
-					<!-- progressbar scaffold for jQuery -->
-					<div id="civivipgive-sync-progressbar" role="progressbar">
-						<div id="progress-label" class="progress-label">
-							<!-- value supplied by jQuery -->
-						</div>
-					</div>
-					<!-- /progressbar -->
-				</div>
-			</td>
-		</tr>
-		<?php
 	}
 
 	/**
