@@ -78,14 +78,30 @@ class Admin {
 			);
 		}
 
+		// Handle form submission
+		if (isset($_POST['civivipgive_save_settings'])) {
+			check_admin_referer('civivipgive_settings');
+
+			$settings = $this->addSettings([]);
+			foreach ($settings as $setting) {
+				if (isset($setting['id']) && isset($_POST[$setting['id']])) {
+					give_update_option($setting['id'], sanitize_text_field($_POST[$setting['id']]));
+				}
+			}
+
+			echo '<div class="notice notice-success"><p><strong>Settings saved.</strong></p></div>';
+		}
+
 		// Get settings to render manually
 		$settings = $this->addSettings([]);
 
-		// Render settings
+		// Render settings form
 		?>
-		<table class="form-table">
-			<?php
-			foreach ($settings as $setting) {
+		<form method="post" action="">
+			<?php wp_nonce_field('civivipgive_settings'); ?>
+			<table class="form-table">
+				<?php
+				foreach ($settings as $setting) {
 				if ($setting['type'] === 'title') {
 					?>
 					<tr>
@@ -154,27 +170,35 @@ class Admin {
 			?>
 		</table>
 
+		<p class="submit">
+			<input type="submit" name="civivipgive_save_settings" class="button button-primary" value="<?php echo esc_attr(__('Save Changes', 'civivip-give')); ?>">
+		</p>
+		</form>
+
 		<!-- Manual Sync Card -->
-	    <div class="card" id="civivipgive-sync-card" style="margin-top: 20px;">
+	    <div class="card" id="civivipgive-sync-card" style="margin-top: 20px; padding: 20px;">
 	        <h2 class="title">
 	        	<?= __('CiviCRM Integration Manual Sync', 'civivip-give'); ?>
 	    	</h2>
 
-	        <label for="civivipgive-sync-submit">
+	        <p>
 	        	<?= __(
         			'Click to manually synchronize Give donations to CiviContribute.',
         			'civivip-give'
         		); ?>
-	        </label>
-            <input
-            	name="civivipgive-sync-submit" id="civivipgive-sync-submit"
-            	class="button button-primary button-hero"
-            	type="submit" value="<?= __('Sync', 'civivip-give'); ?>"
-        	>
+	        </p>
+
+            <p>
+	            <input
+	            	name="civivipgive-sync-submit" id="civivipgive-sync-submit"
+	            	class="button button-primary button-hero"
+	            	type="button" value="<?= __('Sync Now', 'civivip-give'); ?>"
+	        	>
+        	</p>
 
 			<!-- progressbar scaffold for jQuery -->
-	        <div id="civivipgive-sync-progressbar" role="progressbar">
-	            <div id="progress-label" class="progress-label">
+	        <div id="civivipgive-sync-progressbar" role="progressbar" style="margin-top: 20px; height: 30px; border: 1px solid #ccc; background: #f0f0f0; position: relative;">
+	            <div id="progress-label" class="progress-label" style="position: absolute; width: 100%; text-align: center; line-height: 30px; font-weight: bold;">
 	            	<!-- value supplied by jQuery -->
 	            </div>
 	        </div>
