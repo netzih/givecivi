@@ -60,6 +60,8 @@ class Hamual {
 		add_action('give_updated_edited_donation', [$this, 'syncDonationToContrib']);	// param: payment_id
 		add_action('give_payments_table_do_bulk_action', [$this, 'checkAction'], 10, 2);	// params: id, this->current_action
 		add_action('give_subscription_inserted', [$this, 'syncSubscriptionToRecur'], 10, 2);	// params: subscription_id, data
+		add_action('give_recurring_record_payment', [$this, 'syncRenewalPayment'], 10, 4);	// params: payment_id, subscription, amount, txn_id
+		add_action('give_subscription_payment_complete', [$this, 'syncDonationToContrib'], 10, 1);	// param: payment_id
 	}
 
 	/**
@@ -150,7 +152,7 @@ class Hamual {
 	 *
 	 * @param 	int 	$subscription_id 	returned by hook
 	 * @param 	array 	$data 				returned by hook (see give-recurring/give-subscription@create)
-	 * 
+	 *
 	 * @return 	void
 	 */
 	public function syncSubscriptionToRecur($subscription_id, $data)
@@ -160,11 +162,30 @@ class Hamual {
 		$subscription = $this->subscriptions->fetch($subscription_id);
 		$parent_donation = $this->donations->fetch($data['parent_payment_id']);
 		$contact_id = $this->contacts->store($parent_donation['donor info']);
-		
+
 		$result = $this->recurrences->store($subscription, $contact_id);
-		
+
 		if ( $result === 'Failed to store' ) {
 			Debug::err_log( 'Give CiviCRM failed to auto-sync:' . var_export( $subscription, true ) );
 		}
+	}
+
+	/**
+	 * Handle renewal payment recording from Give Recurring Donations Add-on.
+	 * This ensures each recurring payment (not just the first one) is synced to CiviCRM.
+	 *
+	 * @since 	0.4.0
+	 *
+	 * @param 	int 	$payment_id 	The renewal payment ID
+	 * @param 	object 	$subscription 	The subscription object
+	 * @param 	float 	$amount 		The payment amount
+	 * @param 	string 	$txn_id 		The transaction ID
+	 *
+	 * @return 	void
+	 */
+	public function syncRenewalPayment($payment_id, $subscription, $amount, $txn_id)
+	{
+		// Sync the renewal payment to CiviCRM as a contribution
+		$this->syncDonationToContrib($payment_id);
 	}
 }

@@ -38,7 +38,7 @@ class SchemeAdapter {
 
 		if (isset($payment_meta['subscription_id']) && $payment_meta['subscription_id'] !== '') {
 			$subscription = $subscriptions->fetch($payment_meta['subscription_id']);
-			if ( ! $subscription = 'Failed to fetch') {
+			if ($subscription !== 'Failed to fetch') {
 				$recurrence_id = $recurrences->fetch($subscription['trxn_id']);
 			}
 		}
@@ -50,38 +50,27 @@ class SchemeAdapter {
 			// Donor related
 			'donor info' => [
 				'contact_type'				=> 'Individual',	// Give doesn't track this datum, yet CiviCRM requires it.
-				'email' 					=> $user_info['email'],	// CiviCRM "dedupe" rules generally make use of this
+				'email' 					=> $user_info['email'] ?? '',	// CiviCRM "dedupe" rules generally make use of this
 				'external_identifier'		=> 'give-' . $payment->donor_id,
-				'first_name'				=> $user_info['first_name'],
-				'last_name'					=> $user_info['last_name'],
+				'first_name'				=> $user_info['first_name'] ?? '',
+				'last_name'					=> $user_info['last_name'] ?? '',
 				'source'					=> 'Give',
-				'_wp_user_id'				=> $payment->user_id,
+				'_wp_user_id'				=> $payment->user_id ?? 0,
 			],
 			// For use by controllers
 			'meta' => [
-				'_give_subscription_id'		=> (isset($payment_meta['subscription_id'])
-												? $payment_meta['subscription_id']
-												: ''),
+				'_give_subscription_id'		=> $payment_meta['subscription_id'] ?? '',
 			],
 			// Donation related
-			'cancel_date' 				=> (	// i.e., refund date
-											$payment->status_nicename === 'Refunded'
-											? $payment->post_modified
-											: ''),
-			'contribution_recur_id'		=> (isset($recurrence_id)
-											? $recurrence_id
-											: ''),
+			'cancel_date' 				=> $payment->status_nicename === 'Refunded' ? $payment->post_modified : '',
+			'contribution_recur_id'		=> $recurrence_id ?? '',
 			'contribution_source' 		=> 'Give - ' . $payment_meta['_give_payment_form_title'],
 			'contribution_status_id'	=> Interpreter::paymentStatus($payment->status_nicename),
-			'currency' 					=> $payment_meta['currency'],
+			'currency' 					=> $payment_meta['currency'] ?? 'USD',
 			'financial_type_id'			=> 'Donation',	// Give has no equivalent but CiviContribute requires this.
-			'is_pay_later' 				=> ($payment_meta['_give_payment_gateway'] === 'offline'
-											? 1
-											: 0),
-			'is_test' 					=> (isset($payment_meta['_give_payment_mode']) && $payment_meta['_give_payment_mode'] === 'test'
-											? 1
-											: 0),
-			'payment_instrument_id'		=> 'See Give', 	// CiviCRM defaults to 'Check', which would be inaccurate
+			'is_pay_later' 				=> ($payment_meta['_give_payment_gateway'] ?? '') === 'offline' ? 1 : 0,
+			'is_test' 					=> (($payment_meta['_give_payment_mode'] ?? '') === 'test') ? 1 : 0,
+			'payment_instrument_id'		=> Interpreter::paymentInstrument($payment_meta['_give_payment_gateway'] ?? 'manual'),
 			'receive_date' 				=> $payment->date,
 			'total_amount' 				=> number_format($payment_meta['_give_payment_total'], 2),
 			'trxn_id' 					=> 'give-' . $payment->key . '-' . $payment->ID,	// NB key alone would not be unique
@@ -102,17 +91,15 @@ class SchemeAdapter {
 	public static function subscription(array $subscription)
 	{
 		return [
-			'amount' 				=> number_format($subscription['recurring_amount'], 2),
-			'auto_renew' 			=> ($subscription['bill_times'] !== '0'
-										?: '1'),
+			'amount' 				=> number_format($subscription['recurring_amount'] ?? 0, 2),
+			'auto_renew' 			=> ($subscription['bill_times'] ?? '0') !== '0' ? 0 : 1,
 			'financial_type_id' 	=> 'Donation',	// Give has no equivalent but CiviContribute requires this.
-			'frequency_unit' 		=> $subscription['period'],	// day week month year
-			'frequency_interval'	=> $subscription['frequency'],	// 1 2 3 4 5 6 (in Give; unlimited in Civi)
-			'installments' 			=> ($subscription['bill_times'] !== '0'
-										?: ''),	// 0 indicates perpetual
-			'start_date' 			=> $subscription['created'],	//WILL WE NEED TO USE SOMETHING LIKE CARBON?
+			'frequency_unit' 		=> $subscription['period'] ?? 'month',	// day week month year
+			'frequency_interval'	=> $subscription['frequency'] ?? 1,	// 1 2 3 4 5 6 (in Give; unlimited in Civi)
+			'installments' 			=> ($subscription['bill_times'] ?? '0') !== '0' ? $subscription['bill_times'] : '',	// 0 indicates perpetual
+			'start_date' 			=> $subscription['created'] ?? date('Y-m-d H:i:s'),
 			// For use by controllers
-			'trxn_id' 				=> 'give-' . $subscription['transaction_id'] . '-' . $subscription['id'],
+			'trxn_id' 				=> 'give-' . ($subscription['transaction_id'] ?? '') . '-' . ($subscription['id'] ?? ''),
 		];
 	}
 
@@ -131,19 +118,24 @@ class SchemeAdapter {
 	public static function contribution(array $contribution)
 	{
 		$contrib = $contribution['values'][$contribution['id'] ];
-		// Fetch the 'See Give' payment method's ID, since this will vary by installation.
+
+		// Get payment instrument label from ID
+		$payment_instrument_label = 'Credit Card'; // default
 		try {
 			civicrm_initialize();
 			$result = civicrm_api3(
 				'OptionValue',
 				'get',
-				['name' => 'See Give']
+				[
+					'option_group_id' => 'payment_instrument',
+					'value' => $contrib['payment_instrument_id']
+				]
 			);
+			if (is_array($result) && isset($result['id'])) {
+				$payment_instrument_label = $result['values'][$result['id']]['label'];
+			}
 		} catch (\CiviCRM_API3_Exception $e) {
 			Debug::log($e->getMessage() );	// unreliable
-		}
-		if(is_array($result) && isset($result['id']) ) {
-			$payment_instrument_id = $result['values'][$result['id'] ]['value'];
 		}
 
 		return [
@@ -164,9 +156,7 @@ class SchemeAdapter {
 											: 'error'),
 			'is_pay_later' 				=> intval($contrib['is_pay_later']),
 			'is_test' 					=> intval($contrib['is_test']),
-			'payment_instrument_id'		=> ($contrib['payment_instrument_id'] == $payment_instrument_id
-											? 'See Give'
-											: 'error'),
+			'payment_instrument_id'		=> $payment_instrument_label,
 			'receive_date' 				=> date_format(date_create($contrib['receive_date']), 'Y-m-d H:i:s'),
 			'total_amount' 				=> number_format($contrib['total_amount'], 2),
 			'trxn_id' 					=> $contrib['trxn_id'],
