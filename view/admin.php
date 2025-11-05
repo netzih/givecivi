@@ -22,26 +22,32 @@ class Admin {
 	function __construct()
 	{
 		add_filter('give-settings_tabs_array', [$this, 'addOurTab']);
+		add_action('give-settings_sections_civivip-give_page', [$this, 'displayTabPage']);
 		add_filter('give_get_settings_civivip-give', [$this, 'addSettings']);
-		add_action('admin_enqueue_scripts', [$this, 'enqueueAssets']);
 		add_action('wp_ajax_civivipgive-sync', [$this, 'blastOff']);
 	}
 
 	/**
-	 * Enqueue assets on settings page.
+	 * Add a tab to Give's Settings tabs.
 	 *
-	 * @since 	0.5.0
+	 * @param 	array 	$tabs returned by tabs_array filter
+	 *
+	 * @return 	array
 	 */
-	public function enqueueAssets()
+	public function addOurTab($tabs)
 	{
-		// Only load on Give settings page
-		if (!isset($_GET['page']) || $_GET['page'] !== 'give-settings') {
-			return;
-		}
-		if (!isset($_GET['tab']) || $_GET['tab'] !== 'civivip-give') {
-			return;
-		}
+		$tabs['civivip-give'] = 'CiviCRM Integration';
+		return $tabs;
+	}
 
+	/**
+	 * Display the settings page content.
+	 *
+	 * @since 	1.0
+	 */
+	public function displayTabPage()
+	{
+		// CSS and JavaScript
 		$wp_scripts = new \WP_Scripts;
 		wp_enqueue_style(
 			'civivipgive-progressbar',
@@ -50,7 +56,6 @@ class Admin {
 				. '/themes/smoothness/jquery-ui.css'
 		);
 
-		// Check if custom CSS/JS files exist before enqueuing
 		if (file_exists(CIVIVIPGIVE_DIR . 'assets/css/civivipgive_admin_tab.css')) {
 			wp_enqueue_style(
 				'civivipgive-admin-tab',
@@ -72,19 +77,35 @@ class Admin {
 				]
 			);
 		}
-	}
 
-	/**
-	 * Add a tab to Give's Settings tabs.
-	 *
-	 * @param 	array 	$tabs returned by tabs_array filter
-	 *
-	 * @return 	array
-	 */
-	public function addOurTab($tabs)
-	{
-		$tabs['civivip-give'] = 'CiviCRM Integration';
-		return $tabs;
+		// HTML - Settings will render here automatically, then we add manual sync
+		?>
+	    <div class="card" id="civivipgive-sync-card" style="margin-top: 20px;">
+	        <h2 class="title">
+	        	<?= __('CiviCRM Integration Manual Sync', 'civivip-give'); ?>
+	    	</h2>
+
+	        <label for="civivipgive-sync-submit">
+	        	<?= __(
+        			'Click to manually synchronize Give donations to CiviContribute.',
+        			'civivip-give'
+        		); ?>
+	        </label>
+            <input
+            	name="civivipgive-sync-submit" id="civivipgive-sync-submit"
+            	class="button button-primary button-hero"
+            	type="submit" value="<?= __('Sync', 'civivip-give'); ?>"
+        	>
+
+			<!-- progressbar scaffold for jQuery -->
+	        <div id="civivipgive-sync-progressbar" role="progressbar">
+	            <div id="progress-label" class="progress-label">
+	            	<!-- value supplied by jQuery -->
+	            </div>
+	        </div>
+	        <!-- /progressbar -->
+	    </div>
+ 		<?php
 	}
 
 	/**
