@@ -23,7 +23,55 @@ class Admin {
 	{
 		add_filter('give-settings_tabs_array', [$this, 'addOurTab']);
 		add_filter('give_get_settings_civivip-give', [$this, 'addSettings']);
+		add_action('admin_enqueue_scripts', [$this, 'enqueueAssets']);
 		add_action('wp_ajax_civivipgive-sync', [$this, 'blastOff']);
+	}
+
+	/**
+	 * Enqueue assets on settings page.
+	 *
+	 * @since 	0.5.0
+	 */
+	public function enqueueAssets()
+	{
+		// Only load on Give settings page
+		if (!isset($_GET['page']) || $_GET['page'] !== 'give-settings') {
+			return;
+		}
+		if (!isset($_GET['tab']) || $_GET['tab'] !== 'civivip-give') {
+			return;
+		}
+
+		$wp_scripts = new \WP_Scripts;
+		wp_enqueue_style(
+			'civivipgive-progressbar',
+			'https://ajax.googleapis.com/ajax/libs/jqueryui/'
+				. $wp_scripts->registered['jquery-ui-core']->ver
+				. '/themes/smoothness/jquery-ui.css'
+		);
+
+		// Check if custom CSS/JS files exist before enqueuing
+		if (file_exists(CIVIVIPGIVE_DIR . 'assets/css/civivipgive_admin_tab.css')) {
+			wp_enqueue_style(
+				'civivipgive-admin-tab',
+				CIVIVIPGIVE_URL . 'assets/css/civivipgive_admin_tab.css'
+			);
+		}
+
+		if (file_exists(CIVIVIPGIVE_DIR . 'assets/js/civivipgive_admin_tab.js')) {
+			wp_enqueue_script(
+				'civivipgive-admin-tab-sync',
+				CIVIVIPGIVE_URL . 'assets/js/civivipgive_admin_tab.js',
+				['jquery', 'jquery-ui-progressbar']
+			);
+			wp_localize_script(
+				'civivipgive-admin-tab-sync',
+				'civivipgive_jsparams', [
+					'tempprogfileurl' => trailingslashit(CIVIVIPGIVE_TEMPDIR_URL) . 'civivipgive_percent.tmp',
+					'permission' => current_user_can('administrator'),
+				]
+			);
+		}
 	}
 
 	/**
@@ -210,9 +258,6 @@ class Admin {
 	 */
 	protected function getManualSyncSettings()
 	{
-		// Enqueue assets
-		$this->enqueueManualSyncAssets();
-
 		return [
 			[
 				'id' => 'civivipgive_manual_sync_settings',
@@ -220,8 +265,8 @@ class Admin {
 				'title' => __('Manual Synchronization', 'civivip-give'),
 			],
 			[
-				'name' => __('Sync Donations', 'civivip-give'),
-				'desc' => $this->getManualSyncHTML(),
+				'name' => __('Sync Now', 'civivip-give'),
+				'desc' => __('Click the button below to manually synchronize all Give donations to CiviCRM. <br><br><button type="button" class="button button-primary" id="civivipgive-sync-submit">Sync Now</button><div id="civivipgive-sync-progressbar" role="progressbar" style="margin-top: 15px; display:none;"><div id="progress-label" class="progress-label"></div></div>', 'civivip-give'),
 				'id' => 'civivipgive_manual_sync_desc',
 				'type' => 'descriptive_text',
 			],
@@ -230,69 +275,6 @@ class Admin {
 				'type' => 'sectionend',
 			],
 		];
-	}
-
-	/**
-	 * Get manual sync HTML.
-	 *
-	 * @since 	0.5.0
-	 *
-	 * @return 	string
-	 */
-	protected function getManualSyncHTML()
-	{
-		ob_start();
-		?>
-		<div style="margin-top: 10px;">
-			<p><?php echo __('Click to manually synchronize all Give donations to CiviCRM.', 'civivip-give'); ?></p>
-			<p>
-				<input
-					name="civivipgive-sync-submit"
-					id="civivipgive-sync-submit"
-					class="button button-primary"
-					type="button"
-					value="<?php echo esc_attr(__('Sync Now', 'civivip-give')); ?>"
-				>
-			</p>
-			<!-- progressbar scaffold for jQuery -->
-			<div id="civivipgive-sync-progressbar" role="progressbar" style="margin-top: 15px;">
-				<div id="progress-label" class="progress-label"></div>
-			</div>
-		</div>
-		<?php
-		return ob_get_clean();
-	}
-
-	/**
-	 * Enqueue manual sync assets.
-	 *
-	 * @since 	0.5.0
-	 */
-	protected function enqueueManualSyncAssets()
-	{
-		$wp_scripts = new \WP_Scripts;
-		wp_enqueue_style(
-			'civivipgive-progressbar',
-			'https://ajax.googleapis.com/ajax/libs/jqueryui/'
-				. $wp_scripts->registered['jquery-ui-core']->ver
-				. '/themes/smoothness/jquery-ui.css'
-		);
-		wp_enqueue_style(
-			'civivipgive-admin-tab',
-			CIVIVIPGIVE_URL . 'assets/css/civivipgive_admin_tab.css'
-		);
-		wp_enqueue_script(
-			'civivipgive-admin-tab-sync',
-			CIVIVIPGIVE_URL . 'assets/js/civivipgive_admin_tab.js',
-			['jquery', 'jquery-ui-progressbar']
-		);
-		wp_localize_script(
-			'civivipgive-admin-tab-sync',
-			'civivipgive_jsparams', [
-				'tempprogfileurl' => trailingslashit(CIVIVIPGIVE_TEMPDIR_URL) . 'civivipgive_percent.tmp',
-				'permission' => current_user_can('administrator'),
-			]
-		);
 	}
 
 	/**
