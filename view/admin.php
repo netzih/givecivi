@@ -21,10 +21,10 @@ if ( ! defined('ABSPATH') ) { exit; }
 class Admin {
 	function __construct()
 	{
-		add_filter('give-settings_tabs_array', [$this, 'addOurTab']); // Update: filter is now 'give-settings_tabs_array'; ref give main plugin, /includes/admin/class-admin-settings.php line 257
+		add_filter('give-settings_tabs_array', [$this, 'addOurTab']);
 		add_filter('give_get_sections_civivip-give', [$this, 'addSettingsSections']);
 		add_filter('give_get_settings_civivip-give', [$this, 'addSettings']);
-		add_action('give-settings_sections_civivip-give_page', [$this, 'displayTabPage']);
+		add_action('give_settings_give_manual_sync_html', [$this, 'renderManualSyncField']);
 		add_action('wp_ajax_civivipgive-sync', [$this, 'blastOff']);
 	}
 
@@ -54,6 +54,7 @@ class Admin {
 	{
 		$sections['general'] = __('General Settings', 'civivip-give');
 		$sections['payment-methods'] = __('Payment Method Mappings', 'civivip-give');
+		$sections['manual-sync'] = __('Manual Sync', 'civivip-give');
 		return $sections;
 	}
 
@@ -73,6 +74,9 @@ class Admin {
 		switch ($current_section) {
 			case 'payment-methods':
 				$settings = $this->getPaymentMethodSettings();
+				break;
+			case 'manual-sync':
+				$settings = $this->getManualSyncSettings();
 				break;
 			case 'general':
 			default:
@@ -226,11 +230,40 @@ class Admin {
 	}
 
 	/**
-	 * Template
-	 * 
-	 * @since 	1.0
+	 * Get manual sync settings.
+	 *
+	 * @since 	0.5.0
+	 *
+	 * @return 	array
 	 */
-	public function displayTabPage()
+	protected function getManualSyncSettings()
+	{
+		return [
+			[
+				'id' => 'civivipgive_manual_sync_settings',
+				'type' => 'title',
+			],
+			[
+				'name' => __('Manual Synchronization', 'civivip-give'),
+				'desc' => '',
+				'id' => 'civivipgive_manual_sync_html',
+				'type' => 'give_manual_sync_html',
+			],
+			[
+				'id' => 'civivipgive_manual_sync_settings',
+				'type' => 'sectionend',
+			],
+		];
+	}
+
+	/**
+	 * Render manual sync field in settings.
+	 *
+	 * @since 	0.5.0
+	 *
+	 * @param 	array 	$value
+	 */
+	public function renderManualSyncField($value)
 	{
 		// CSS and JavaScript
 		$wp_scripts = new \WP_Scripts;
@@ -256,39 +289,38 @@ class Admin {
 				'permission' => current_user_can('administrator'),	//'edit_contributions')
 			]
 		);
-		// HTML
 		?>
-	    <div class="card" id="civivipgive-sync-card">
-
-	        <h2 class="title">
-	        	<?= __('CiviCRM Integration Manual Sync', 'civivip-give'); ?>
-	    	</h2>
-
-			<!-- form scaffold for jQuery -->
-			<!-- NB the Give tab we're using already includes a form element. -->
-	            <label for="civivipgive-sync-submit">
-	            	<?= __(
-            			'Click to manually synchronize Give donations to CiviContribute.',
-            			'civivip-give'
-            		); ?>
-	            </label>
-                <input
-                	name="civivipgive-sync-submit" id="civivipgive-sync-submit"
-                	class="button button-primary button-hero"
-                	type="submit" value="<?= __('Sync', 'civivip-give'); ?>"
-            	>
-            <!-- /form -->
-			
-			<!-- progressbar scaffold for jQuery -->
-	        <div id="civivipgive-sync-progressbar" role="progressbar">
-	            <div id="progress-label" class="progress-label">
-	            	<!-- value supplied by jQuery -->
-	            </div>
-	        </div>
-	        <!-- /progressbar -->
-
-	    </div>
- 		<?php
+		<tr valign="top">
+			<th scope="row" class="titledesc">
+				<label for="<?php echo esc_attr($value['id']); ?>">
+					<?php echo esc_html($value['name']); ?>
+				</label>
+			</th>
+			<td class="forminp forminp-<?php echo sanitize_title($value['type']); ?>">
+				<div class="card" id="civivipgive-sync-card" style="max-width: none;">
+					<p class="description">
+						<?php echo __('Click to manually synchronize Give donations to CiviContribute.', 'civivip-give'); ?>
+					</p>
+					<p>
+						<input
+							name="civivipgive-sync-submit"
+							id="civivipgive-sync-submit"
+							class="button button-primary"
+							type="button"
+							value="<?php echo esc_attr(__('Sync Now', 'civivip-give')); ?>"
+						>
+					</p>
+					<!-- progressbar scaffold for jQuery -->
+					<div id="civivipgive-sync-progressbar" role="progressbar">
+						<div id="progress-label" class="progress-label">
+							<!-- value supplied by jQuery -->
+						</div>
+					</div>
+					<!-- /progressbar -->
+				</div>
+			</td>
+		</tr>
+		<?php
 	}
 
 	/**
