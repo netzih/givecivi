@@ -1,6 +1,7 @@
 <?php namespace CivivipGive\Model\Give;
 
 use CivivipGive\Model\Service\SchemeAdapter;
+use CivivipGive\Model\Service\Debug;
 
 if ( ! defined('ABSPATH') ) { exit; }
 
@@ -88,22 +89,33 @@ class Donation {
 	}
 
 	/**
-	 * //SHD PROBABLY RENAME
 	 * Retrieve and process a donation by key. In our use cases, this will be a
-	 * CiviContribute "trxn_id" field, which looks like this:
+	 * CiviContribute "trxn_id" or "invoice_id" field, which looks like this:
 	 * 		give-{Give key}-{Give donation ID}
 	 *
 	 * @since 	1.0
 	 *
 	 * @param 	string 	$trxn_id 	comprises Give key as second segment
 	 *
-	 * @return 	array
+	 * @return 	array|null
 	 */
 	public function fetchByKey($trxn_id)
 	{
-		$key = explode('-', $trxn_id)[1];
+		$parts = explode('-', $trxn_id);
+
+		// Validate format: should have at least 3 parts (give-{key}-{id})
+		if (count($parts) < 3 || $parts[0] !== 'give') {
+			Debug::log("fetchByKey: Invalid trxn_id format: {$trxn_id}");
+			return null;
+		}
+
+		$key = $parts[1];
 
 		$donation = give_get_payment_by('key', $key);
+
+		if (!$donation) {
+			return null;
+		}
 
 		return $this->process($donation);
 	}

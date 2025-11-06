@@ -147,9 +147,22 @@ class Fix {
 			return false;
 		}
 
-		$donation = $this->donations->fetchByKey($contribution['trxn_id']);
+		// For Stripe donations, trxn_id contains the Charge ID (ch_xxx)
+		// We need to use invoice_id which contains the Give tracking ID
+		$lookup_key = $contribution['trxn_id'];
+		if (!empty($contribution['invoice_id']) &&
+		    (strpos($contribution['trxn_id'], 'ch_') === 0 || strpos($contribution['trxn_id'], 'pi_') === 0)) {
+			$lookup_key = $contribution['invoice_id'];
+		}
 
-		if ($donation['contribution_status_id'] !== 'Refunded') {
+		$donation = $this->donations->fetchByKey($lookup_key);
+
+		// Check if donation was found
+		if (!$donation || !is_array($donation)) {
+			return false;
+		}
+
+		if (!isset($donation['contribution_status_id']) || $donation['contribution_status_id'] !== 'Refunded') {
 			return false;
 		}
 
