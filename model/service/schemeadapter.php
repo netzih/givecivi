@@ -67,7 +67,12 @@ class SchemeAdapter {
 		$stripe_link = give_get_option('civivipgive_stripe_link', 'disabled');
 		$gateway = $payment_meta['_give_payment_gateway'] ?? '';
 
+		Debug::log("Processing payment {$payment->ID}: gateway={$gateway}, stripe_link={$stripe_link}");
+
 		if ($stripe_link === 'enabled' && strpos($gateway, 'stripe') !== false) {
+			Debug::log("Stripe integration enabled for payment {$payment->ID}, extracting charge data...");
+			Debug::log("Available meta keys: " . implode(', ', array_keys($payment_meta)));
+
 			// GiveWP stores Stripe data in various meta fields depending on version
 			// Priority order: actual charge ID > payment intent > transaction ID
 
@@ -75,23 +80,39 @@ class SchemeAdapter {
 			$charge_id = $payment_meta['_give_stripe_charge_id'] ??
 			             $payment_meta['_stripe_charge_id'] ?? '';
 
+			Debug::log("Initial charge_id extraction: " . ($charge_id ?: 'empty'));
+
 			// If we got a PaymentIntent ID (pi_xxx) instead of Charge ID (ch_xxx),
 			// look for the charge ID in other fields
 			if (!empty($charge_id) && strpos($charge_id, 'pi_') === 0) {
+				Debug::log("Found Payment Intent ID: {$charge_id}, looking for actual Charge ID...");
+
 				// This is a payment intent, try to find the actual charge ID
 				$actual_charge = $payment_meta['_give_stripe_source_id'] ??
 				                $payment_meta['_stripe_source_id'] ??
 				                $payment_meta['charge_id'] ?? '';
 
+				Debug::log("Checking alternate fields for charge: " . ($actual_charge ?: 'empty'));
+
 				if (!empty($actual_charge) && strpos($actual_charge, 'ch_') === 0) {
 					$charge_id = $actual_charge;
+					Debug::log("Found Charge ID in alternate field: {$charge_id}");
 				} else {
 					// Last resort: check transaction_id field
 					$txn_id = $payment_meta['_give_payment_transaction_id'] ?? '';
+					Debug::log("Checking transaction_id field: " . ($txn_id ?: 'empty'));
+
 					if (!empty($txn_id) && strpos($txn_id, 'ch_') === 0) {
 						$charge_id = $txn_id;
+						Debug::log("Found Charge ID in transaction_id: {$charge_id}");
 					}
 				}
+			}
+
+			// If still empty, try transaction_id field directly
+			if (empty($charge_id)) {
+				$charge_id = $payment_meta['_give_payment_transaction_id'] ?? '';
+				Debug::log("Trying _give_payment_transaction_id directly: " . ($charge_id ?: 'empty'));
 			}
 
 			// If we still only have a payment intent ID, try to get the charge from Stripe
@@ -111,6 +132,9 @@ class SchemeAdapter {
 				}
 				$stripe_data['charge_id'] = $charge_id;
 				$stripe_data['gateway'] = $gateway;
+				Debug::log("Final stripe_data: charge_id={$charge_id}, gateway={$gateway}");
+			} else {
+				Debug::log("No Stripe charge ID found in any metadata field for payment {$payment->ID}");
 			}
 		}
 
