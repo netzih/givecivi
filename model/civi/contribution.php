@@ -131,10 +131,12 @@ class Contribution {
 		}
 
 		if ( ! $result_passes_redux && is_array($result) && isset($result['id'])) {
-			return "Failed to pass {$result['id']}"; Debug::err_log('Give CiviCRM failed to pass:' . var_export($result, true) );
+			Debug::err_log('Give CiviCRM failed to pass contribution ' . $result['id'] . ': trxn_id=' . ($donation['trxn_id'] ?? 'none'));
+			return "Failed to pass {$result['id']}";
 		}
 
-		return 'Failed to store'; Debug::err_log('Give CiviCRM failed to store:' . var_export($donation, true) );
+		Debug::err_log('Give CiviCRM failed to store: trxn_id=' . ($donation['trxn_id'] ?? 'none'));
+		return 'Failed to store';
 	}
 
 	/**

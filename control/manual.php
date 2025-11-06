@@ -67,20 +67,25 @@ class Manual {
 	{
 		$exception_file = trailingslashit(CIVIVIPGIVE_TEMPDIR) . 'civivipgive_exception.tmp';
 
+		// Always delete exception file at start of sync to ensure clean state
+		if (file_exists($exception_file)) {
+			unlink($exception_file);
+		}
+
 		if (class_exists('\Give_Cache') ) { \Give_Cache::flush_cache(); }
 
 		$all_donations = $this->donations->fetchAll();
 
 		if (count($all_donations) === 0) {
 			Progress::$amount = 100;
-			Progress::countDown(100); 
+			Progress::countDown(100);
 			return;
 		}
 		Progress::$amount = count($all_donations);
 
 		foreach ($all_donations as $donation) {
 			set_time_limit(300);
-			
+
 			$contact_id = $this->contacts->store($donation['donor info']);
 
 			$recurrence_id = $this->recurrencesStore($donation['meta']['_give_subscription_id'], $contact_id);
@@ -92,6 +97,7 @@ class Manual {
 			Progress::countDown(1);
 		}
 
+		// Only write exception file if there are actual errors
 		if ( ! empty($this->naughty_list) ) {
 			file_put_contents($exception_file, count($this->naughty_list) );
 		}
