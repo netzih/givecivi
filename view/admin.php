@@ -50,37 +50,24 @@ class Admin {
 	 */
 	public function saveSettings()
 	{
-		// Log that this was called
-		error_log('CiviCRM Integration: saveSettings() method called');
-		error_log('CiviCRM Integration: POST data: ' . print_r($_POST, true));
-
 		// Verify nonce
 		if (!isset($_POST['civivipgive_settings_nonce']) || !wp_verify_nonce($_POST['civivipgive_settings_nonce'], 'civivipgive_save_settings')) {
-			error_log('CiviCRM Integration: Nonce verification failed');
 			wp_die(__('Security check failed', 'civivip-give'));
 		}
 
-		// Check user permissions (use administrator since manage_give_settings may not exist)
+		// Check user permissions
 		if (!current_user_can('administrator')) {
-			error_log('CiviCRM Integration: Permission check failed');
 			wp_die(__('You do not have permission to save these settings', 'civivip-give'));
 		}
 
-		error_log('CiviCRM Integration: Passed security checks, saving settings...');
-
 		// Save each setting
 		$settings = $this->addSettings([]);
-		$saved_count = 0;
 		foreach ($settings as $setting) {
 			if (isset($setting['id']) && isset($_POST[$setting['id']])) {
 				$value = sanitize_text_field($_POST[$setting['id']]);
 				give_update_option($setting['id'], $value);
-				$saved_count++;
-				error_log("CiviCRM Integration: Saved {$setting['id']} = {$value}");
 			}
 		}
-
-		error_log("CiviCRM Integration: Saved {$saved_count} settings total");
 
 		// Redirect back to settings page with success message
 		$redirect_url = add_query_arg([
@@ -88,8 +75,6 @@ class Admin {
 			'tab' => 'civivip-give',
 			'settings-updated' => 'true'
 		], admin_url('admin.php'));
-
-		error_log("CiviCRM Integration: Redirecting to: {$redirect_url}");
 
 		wp_redirect($redirect_url);
 		exit;
@@ -641,7 +626,7 @@ class Admin {
 			unlink($exception_file);
 		}
 
-		if (current_user_can('administrator') ) {	//'edit_contributions') ) {	//UNFORTUNATELY CIVICIRM DOESN'T SUPPORT
+		if (current_user_can('administrator')) {
 			file_put_contents($percent_file, '0');
 			$manual = new Manual;
 			$manual->sync();

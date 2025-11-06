@@ -67,74 +67,25 @@ class SchemeAdapter {
 		$stripe_link = give_get_option('civivipgive_stripe_link', 'disabled');
 		$gateway = $payment_meta['_give_payment_gateway'] ?? '';
 
-		Debug::log("Processing payment {$payment->ID}: gateway={$gateway}, stripe_link={$stripe_link}");
-
 		if ($stripe_link === 'enabled' && strpos($gateway, 'stripe') !== false) {
-			Debug::log("Stripe integration enabled for payment {$payment->ID}, extracting charge data...");
-			Debug::log("Available meta keys: " . implode(', ', array_keys($payment_meta)));
-
 			// GiveWP stores Stripe data in various meta fields depending on version
-			// Priority order: actual charge ID > payment intent > transaction ID
-
-			// Try to get the actual charge ID first (this is what we need for refunds)
+			// Try to get the charge ID (needed for refunds in CiviCRM)
 			$charge_id = $payment_meta['_give_stripe_charge_id'] ??
-			             $payment_meta['_stripe_charge_id'] ?? '';
+			             $payment_meta['_stripe_charge_id'] ??
+			             $payment_meta['_give_payment_transaction_id'] ?? '';
 
-			Debug::log("Initial charge_id extraction: " . ($charge_id ?: 'empty'));
-
-			// If we got a PaymentIntent ID (pi_xxx) instead of Charge ID (ch_xxx),
-			// look for the charge ID in other fields
+			// If we have a Payment Intent ID (pi_xxx) instead of Charge ID (ch_xxx),
+			// retrieve the charge ID from Stripe API
 			if (!empty($charge_id) && strpos($charge_id, 'pi_') === 0) {
-				Debug::log("Found Payment Intent ID: {$charge_id}, looking for actual Charge ID...");
-
-				// This is a payment intent, try to find the actual charge ID
-				$actual_charge = $payment_meta['_give_stripe_source_id'] ??
-				                $payment_meta['_stripe_source_id'] ??
-				                $payment_meta['charge_id'] ?? '';
-
-				Debug::log("Checking alternate fields for charge: " . ($actual_charge ?: 'empty'));
-
-				if (!empty($actual_charge) && strpos($actual_charge, 'ch_') === 0) {
-					$charge_id = $actual_charge;
-					Debug::log("Found Charge ID in alternate field: {$charge_id}");
-				} else {
-					// Last resort: check transaction_id field
-					$txn_id = $payment_meta['_give_payment_transaction_id'] ?? '';
-					Debug::log("Checking transaction_id field: " . ($txn_id ?: 'empty'));
-
-					if (!empty($txn_id) && strpos($txn_id, 'ch_') === 0) {
-						$charge_id = $txn_id;
-						Debug::log("Found Charge ID in transaction_id: {$charge_id}");
-					}
+				$actual_charge_id = self::getChargeFromPaymentIntent($charge_id, $payment_meta);
+				if (!empty($actual_charge_id) && strpos($actual_charge_id, 'ch_') === 0) {
+					$charge_id = $actual_charge_id;
 				}
 			}
 
-			// If still empty, try transaction_id field directly
-			if (empty($charge_id)) {
-				$charge_id = $payment_meta['_give_payment_transaction_id'] ?? '';
-				Debug::log("Trying _give_payment_transaction_id directly: " . ($charge_id ?: 'empty'));
-			}
-
-			// If we still only have a payment intent ID, try to get the charge from Stripe
 			if (!empty($charge_id)) {
-				if (strpos($charge_id, 'pi_') === 0) {
-					Debug::log("Found Payment Intent ID ({$charge_id}), attempting to retrieve Charge ID from Stripe...");
-
-					// Try to get charge ID from Stripe API
-					$actual_charge_id = self::getChargeFromPaymentIntent($charge_id, $payment_meta);
-
-					if (!empty($actual_charge_id) && strpos($actual_charge_id, 'ch_') === 0) {
-						Debug::log("Successfully retrieved Charge ID: {$actual_charge_id}");
-						$charge_id = $actual_charge_id;
-					} else {
-						Debug::log("Warning: Could not retrieve Charge ID from Payment Intent. Refunds may not work. Payment ID: {$payment->ID}");
-					}
-				}
 				$stripe_data['charge_id'] = $charge_id;
 				$stripe_data['gateway'] = $gateway;
-				Debug::log("Final stripe_data: charge_id={$charge_id}, gateway={$gateway}");
-			} else {
-				Debug::log("No Stripe charge ID found in any metadata field for payment {$payment->ID}");
 			}
 		}
 
@@ -273,6 +224,47 @@ class SchemeAdapter {
 	}
 
 	/**
+	 * Get Stripe secret key from GiveWP settings.
+	 *
+	 * @since 	0.6.0
+	 *
+	 * @param 	array 	$payment_meta 	Payment metadata from GiveWP
+	 * @param 	bool 	$test_mode 		Whether to get test or live key
+	 *
+	 * @return 	string 	Secret key or empty string if not found
+	 */
+	protected static function getStripeSecretKey($payment_meta, $test_mode)
+	{
+		// Try standard GiveWP setting names
+		$possible_key_names = $test_mode
+			? ['stripe_test_secret_key', 'give_stripe_test_secret_key', '_give_stripe_test_secret_key']
+			: ['stripe_live_secret_key', 'give_stripe_live_secret_key', '_give_stripe_live_secret_key'];
+
+		foreach ($possible_key_names as $key_name) {
+			$secret_key = give_get_option($key_name, '');
+			if (!empty($secret_key)) {
+				return $secret_key;
+			}
+		}
+
+		// Try account-specific settings from _give_stripe_get_all_accounts
+		$account_slug = $payment_meta['_give_stripe_account_slug'] ?? give_get_option('_give_stripe_default_account', '');
+		if (!empty($account_slug)) {
+			$all_accounts = give_get_option('_give_stripe_get_all_accounts', []);
+			if (isset($all_accounts[$account_slug]) && is_array($all_accounts[$account_slug])) {
+				$account_data = $all_accounts[$account_slug];
+				$key_name = $test_mode ? 'test_secret_key' : 'live_secret_key';
+
+				if (isset($account_data[$key_name]) && !empty($account_data[$key_name])) {
+					return $account_data[$key_name];
+				}
+			}
+		}
+
+		return '';
+	}
+
+	/**
 	 * Get Charge ID from Stripe Payment Intent.
 	 *
 	 * When GiveWP stores a Payment Intent ID instead of a Charge ID,
@@ -289,87 +281,19 @@ class SchemeAdapter {
 	{
 		// Check if Stripe SDK is available (GiveWP loads it)
 		if (!class_exists('\Stripe\Stripe')) {
-			Debug::log('Stripe SDK not available, cannot retrieve Charge ID');
 			return null;
 		}
 
 		try {
-			// Get Stripe API keys from GiveWP settings
-			// Try multiple possible setting names (varies by GiveWP version and gateway)
 			$test_mode = ($payment_meta['_give_payment_mode'] ?? '') === 'test';
-
-			$possible_key_names = $test_mode
-				? ['stripe_test_secret_key', 'give_stripe_test_secret_key', '_give_stripe_test_secret_key']
-				: ['stripe_live_secret_key', 'give_stripe_live_secret_key', '_give_stripe_live_secret_key'];
-
-			$secret_key = '';
-			foreach ($possible_key_names as $key_name) {
-				$secret_key = give_get_option($key_name, '');
-				if (!empty($secret_key)) {
-					Debug::log("Found Stripe API key using setting: {$key_name}");
-					break;
-				}
-			}
-
-			// If still not found, try to get from Stripe account settings
-			if (empty($secret_key)) {
-				$account_slug = $payment_meta['_give_stripe_account_slug'] ?? '';
-				Debug::log("Extracted account slug: " . ($account_slug ?: 'empty'));
-
-				if (!empty($account_slug)) {
-					$account_key = $test_mode ? "give_stripe_{$account_slug}_test_secret_key" : "give_stripe_{$account_slug}_live_secret_key";
-					Debug::log("Trying account-specific key: {$account_key}");
-					$secret_key = give_get_option($account_key, '');
-					if (!empty($secret_key)) {
-						Debug::log("Found Stripe API key using account setting: {$account_key}");
-					}
-				}
-			}
-
-			// Try to get from _give_stripe_get_all_accounts array
-			if (empty($secret_key)) {
-				$account_slug = $payment_meta['_give_stripe_account_slug'] ?? '';
-				if (empty($account_slug)) {
-					$account_slug = give_get_option('_give_stripe_default_account', '');
-				}
-
-				$all_accounts = give_get_option('_give_stripe_get_all_accounts', []);
-				if (!empty($all_accounts) && is_array($all_accounts) && !empty($account_slug)) {
-					Debug::log("Examining _give_stripe_get_all_accounts structure for account: {$account_slug}");
-
-					// The account slug might be stored as a key or in a nested structure
-					if (isset($all_accounts[$account_slug])) {
-						$account_data = $all_accounts[$account_slug];
-						Debug::log("Found account data in all_accounts array");
-
-						// Try various possible key names for the secret
-						$possible_secret_keys = $test_mode
-							? ['test_secret_key', 'secret_key_test', 'test_secret', 'secret_test']
-							: ['live_secret_key', 'secret_key_live', 'live_secret', 'secret_live', 'secret_key', 'secret'];
-
-						foreach ($possible_secret_keys as $key) {
-							if (isset($account_data[$key]) && !empty($account_data[$key])) {
-								$secret_key = $account_data[$key];
-								Debug::log("Found secret key in account data under key: {$key}");
-								break;
-							}
-						}
-					} else {
-						// Maybe accounts are stored in a different structure, log first few keys
-						Debug::log("Account structure - keys: " . implode(', ', array_slice(array_keys($all_accounts), 0, 5)));
-					}
-				}
-			}
+			$secret_key = self::getStripeSecretKey($payment_meta, $test_mode);
 
 			if (empty($secret_key)) {
-				Debug::log('Stripe API key not found in GiveWP settings. Tried: ' . implode(', ', $possible_key_names));
 				return null;
 			}
 
-			// Initialize Stripe
+			// Initialize Stripe and retrieve the Payment Intent
 			\Stripe\Stripe::setApiKey($secret_key);
-
-			// Retrieve the Payment Intent
 			$intent = \Stripe\PaymentIntent::retrieve($payment_intent_id);
 
 			// Get the charge ID from the latest charge
@@ -382,7 +306,6 @@ class SchemeAdapter {
 				return $intent->charges->data[0]->id;
 			}
 
-			Debug::log("Payment Intent {$payment_intent_id} has no charges");
 			return null;
 
 		} catch (\Exception $e) {

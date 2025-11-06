@@ -46,7 +46,6 @@ class Job {
 			if ($processor_id === null) {
 				$results['is_error'] = 1;
 				$results['error_message'] = 'No active Stripe payment processor found in CiviCRM';
-				Debug::log('Job failed: No Stripe payment processor found');
 				return $results;
 			}
 
@@ -59,7 +58,6 @@ class Job {
 			if (empty($processor['values'][0])) {
 				$results['is_error'] = 1;
 				$results['error_message'] = 'Could not retrieve Stripe payment processor details';
-				Debug::log('Job failed: Could not retrieve processor details');
 				return $results;
 			}
 
@@ -74,7 +72,6 @@ class Job {
 			if (empty($api_key)) {
 				$results['is_error'] = 1;
 				$results['error_message'] = 'Stripe API key not configured in payment processor';
-				Debug::log('Job failed: No API key in payment processor');
 				return $results;
 			}
 
@@ -82,7 +79,6 @@ class Job {
 			if (!class_exists('\Stripe\Stripe')) {
 				$results['is_error'] = 1;
 				$results['error_message'] = 'Stripe SDK not available';
-				Debug::log('Job failed: Stripe SDK not available');
 				return $results;
 			}
 
@@ -92,8 +88,6 @@ class Job {
 				'sequential' => 1,
 				'options' => ['limit' => 100], // Process 100 at a time
 			]);
-
-			Debug::log("Job starting: Found {$contributions['count']} contributions linked to Stripe processor");
 
 			foreach ($contributions['values'] as $contribution) {
 				$trxn_id = $contribution['trxn_id'] ?? '';
@@ -126,11 +120,8 @@ class Job {
 							'id' => $contribution['id'],
 							'trxn_id' => $charge_id,
 						]);
-
 						$results['updated']++;
-						Debug::log("Converted contribution {$contribution['id']}: {$trxn_id} → {$charge_id}");
 					} else {
-						Debug::log("No charge found for Payment Intent {$trxn_id} in contribution {$contribution['id']}");
 						$results['failed']++;
 					}
 
@@ -141,7 +132,6 @@ class Job {
 			}
 
 			$results['values'][] = "Processed {$results['processed']} Payment Intents, updated {$results['updated']}, failed {$results['failed']}";
-			Debug::log("Job completed: Processed={$results['processed']}, Updated={$results['updated']}, Failed={$results['failed']}");
 
 		} catch (\CiviCRM_API3_Exception $e) {
 			$results['is_error'] = 1;
@@ -171,7 +161,6 @@ class Job {
 			]);
 
 			if ($existing['count'] > 0) {
-				Debug::log('Scheduled job already registered');
 				return;
 			}
 
@@ -185,10 +174,8 @@ class Job {
 				'is_active' => 1,
 			]);
 
-			Debug::log('Scheduled job registered successfully');
-
 		} catch (\CiviCRM_API3_Exception $e) {
-			Debug::log('Error registering scheduled job: ' . $e->getMessage());
+			// Silently fail - job registration is optional
 		}
 	}
 }
