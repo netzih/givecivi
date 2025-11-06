@@ -68,13 +68,47 @@ class SchemeAdapter {
 		$gateway = $payment_meta['_give_payment_gateway'] ?? '';
 
 		if ($stripe_link === 'enabled' && strpos($gateway, 'stripe') !== false) {
-			// GiveWP stores Stripe charge ID in various meta fields depending on version
-			// Try multiple possible field names
-			$charge_id = $payment_meta['_give_stripe_charge_id'] ??
-			             $payment_meta['_stripe_charge_id'] ??
-			             $payment_meta['_give_payment_transaction_id'] ?? '';
+			// GiveWP stores Stripe data in various meta fields depending on version
+			// Priority order: actual charge ID > payment intent > transaction ID
 
+			// Try to get the actual charge ID first (this is what we need for refunds)
+			$charge_id = $payment_meta['_give_stripe_charge_id'] ??
+			             $payment_meta['_stripe_charge_id'] ?? '';
+
+			// If we got a PaymentIntent ID (pi_xxx) instead of Charge ID (ch_xxx),
+			// look for the charge ID in other fields
+			if (!empty($charge_id) && strpos($charge_id, 'pi_') === 0) {
+				// This is a payment intent, try to find the actual charge ID
+				$actual_charge = $payment_meta['_give_stripe_source_id'] ??
+				                $payment_meta['_stripe_source_id'] ??
+				                $payment_meta['charge_id'] ?? '';
+
+				if (!empty($actual_charge) && strpos($actual_charge, 'ch_') === 0) {
+					$charge_id = $actual_charge;
+				} else {
+					// Last resort: check transaction_id field
+					$txn_id = $payment_meta['_give_payment_transaction_id'] ?? '';
+					if (!empty($txn_id) && strpos($txn_id, 'ch_') === 0) {
+						$charge_id = $txn_id;
+					}
+				}
+			}
+
+			// If we still only have a payment intent ID, try to get the charge from Stripe
 			if (!empty($charge_id)) {
+				if (strpos($charge_id, 'pi_') === 0) {
+					Debug::log("Found Payment Intent ID ({$charge_id}), attempting to retrieve Charge ID from Stripe...");
+
+					// Try to get charge ID from Stripe API
+					$actual_charge_id = self::getChargeFromPaymentIntent($charge_id, $payment_meta);
+
+					if (!empty($actual_charge_id) && strpos($actual_charge_id, 'ch_') === 0) {
+						Debug::log("Successfully retrieved Charge ID: {$actual_charge_id}");
+						$charge_id = $actual_charge_id;
+					} else {
+						Debug::log("Warning: Could not retrieve Charge ID from Payment Intent. Refunds may not work. Payment ID: {$payment->ID}");
+					}
+				}
 				$stripe_data['charge_id'] = $charge_id;
 				$stripe_data['gateway'] = $gateway;
 			}
@@ -212,5 +246,63 @@ class SchemeAdapter {
 			'total_amount' 				=> number_format($contrib['total_amount'], 2),
 			'trxn_id' 					=> $contrib['trxn_id'],
 		];
+	}
+
+	/**
+	 * Get Charge ID from Stripe Payment Intent.
+	 *
+	 * When GiveWP stores a Payment Intent ID instead of a Charge ID,
+	 * we need to query Stripe to get the actual Charge ID for refunds.
+	 *
+	 * @since 	0.6.0
+	 *
+	 * @param 	string 	$payment_intent_id 	Stripe Payment Intent ID (pi_xxx)
+	 * @param 	array 	$payment_meta 		Payment metadata from GiveWP
+	 *
+	 * @return 	string|null 	Charge ID or null if not found
+	 */
+	protected static function getChargeFromPaymentIntent($payment_intent_id, $payment_meta)
+	{
+		// Check if Stripe SDK is available (GiveWP loads it)
+		if (!class_exists('\Stripe\Stripe')) {
+			Debug::log('Stripe SDK not available, cannot retrieve Charge ID');
+			return null;
+		}
+
+		try {
+			// Get Stripe API keys from GiveWP settings
+			$test_mode = ($payment_meta['_give_payment_mode'] ?? '') === 'test';
+			$secret_key = $test_mode
+				? give_get_option('stripe_test_secret_key', '')
+				: give_get_option('stripe_live_secret_key', '');
+
+			if (empty($secret_key)) {
+				Debug::log('Stripe API key not found in GiveWP settings');
+				return null;
+			}
+
+			// Initialize Stripe
+			\Stripe\Stripe::setApiKey($secret_key);
+
+			// Retrieve the Payment Intent
+			$intent = \Stripe\PaymentIntent::retrieve($payment_intent_id);
+
+			// Get the charge ID from the latest charge
+			if (isset($intent->latest_charge) && !empty($intent->latest_charge)) {
+				return $intent->latest_charge;
+			}
+
+			// Fallback: check charges array
+			if (isset($intent->charges->data) && count($intent->charges->data) > 0) {
+				return $intent->charges->data[0]->id;
+			}
+
+			Debug::log("Payment Intent {$payment_intent_id} has no charges");
+			return null;
+
+		} catch (\Exception $e) {
+			Debug::log('Error retrieving Charge ID from Stripe: ' . $e->getMessage());
+			return null;
+		}
 	}
 }
