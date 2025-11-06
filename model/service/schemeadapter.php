@@ -326,24 +326,36 @@ class SchemeAdapter {
 				}
 			}
 
-			// Last resort: try to find ANY give option with 'stripe' and 'secret' in the name
+			// Last resort: try to find ANY option with 'stripe' in the name
 			if (empty($secret_key)) {
-				Debug::log("Attempting to find Stripe keys by searching all GiveWP options...");
+				Debug::log("Attempting to find Stripe keys by searching WordPress options...");
 				global $wpdb;
-				$mode_suffix = $test_mode ? 'test' : 'live';
+
+				// First, search for any option with 'stripe' in the name
 				$query = $wpdb->prepare(
-					"SELECT option_name, option_value FROM {$wpdb->options}
-					WHERE option_name LIKE %s AND option_name LIKE %s
-					AND option_name LIKE %s LIMIT 5",
-					'%give%',
-					'%stripe%',
-					'%' . $mode_suffix . '%'
+					"SELECT option_name FROM {$wpdb->options}
+					WHERE option_name LIKE %s
+					ORDER BY option_name LIMIT 20",
+					'%stripe%'
 				);
 				$results = $wpdb->get_results($query);
-				Debug::log("Found " . count($results) . " potential Stripe option keys:");
+				Debug::log("Found " . count($results) . " options with 'stripe' in name:");
 				foreach ($results as $row) {
-					$value_preview = substr($row->option_value, 0, 20) . '...';
-					Debug::log("  - {$row->option_name}: {$value_preview}");
+					Debug::log("  - {$row->option_name}");
+				}
+
+				// Check if settings are stored in give_settings option (common in GiveWP)
+				$give_settings = get_option('give_settings', false);
+				if ($give_settings && is_array($give_settings)) {
+					Debug::log("Checking 'give_settings' array for Stripe keys...");
+					$stripe_keys_in_settings = array_filter(array_keys($give_settings), function($key) {
+						return strpos($key, 'stripe') !== false;
+					});
+					Debug::log("Found " . count($stripe_keys_in_settings) . " stripe-related keys in give_settings:");
+					foreach (array_slice($stripe_keys_in_settings, 0, 20) as $key) {
+						$value_preview = is_string($give_settings[$key]) ? substr($give_settings[$key], 0, 20) . '...' : '[not string]';
+						Debug::log("  - {$key}: {$value_preview}");
+					}
 				}
 			}
 
