@@ -62,6 +62,24 @@ class SchemeAdapter {
 			$billing_address = array_filter($billing_address);
 		}
 
+		// Extract Stripe payment processor data if enabled
+		$stripe_data = [];
+		$stripe_link = give_get_option('civivipgive_stripe_link', 'disabled');
+		$gateway = $payment_meta['_give_payment_gateway'] ?? '';
+
+		if ($stripe_link === 'enabled' && strpos($gateway, 'stripe') !== false) {
+			// GiveWP stores Stripe charge ID in various meta fields depending on version
+			// Try multiple possible field names
+			$charge_id = $payment_meta['_give_stripe_charge_id'] ??
+			             $payment_meta['_stripe_charge_id'] ??
+			             $payment_meta['_give_payment_transaction_id'] ?? '';
+
+			if (!empty($charge_id)) {
+				$stripe_data['charge_id'] = $charge_id;
+				$stripe_data['gateway'] = $gateway;
+			}
+		}
+
 		return [
 			// Donor related
 			'donor info' => [
@@ -77,6 +95,7 @@ class SchemeAdapter {
 			// For use by controllers
 			'meta' => [
 				'_give_subscription_id'		=> $payment_meta['subscription_id'] ?? '',
+				'_stripe_data'				=> $stripe_data,	// Stripe processor data
 			],
 			// Donation related
 			'cancel_date' 				=> $payment->status_nicename === 'Refunded' ? $payment->post_modified : '',

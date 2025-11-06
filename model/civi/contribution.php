@@ -53,9 +53,26 @@ class Contribution {
 			$addendum = ['contribution_id' => $result_exists['id'] ];
 		}
 
+		// Extract Stripe data from meta before unsetting it
+		$stripe_data = $donation['meta']['_stripe_data'] ?? [];
+
 		$addendum = (isset($addendum)
 					? $addendum + ['contact_id' => $contact_id]
 					: ['contact_id' => $contact_id]);
+
+		// Add Stripe payment processor if available
+		if (!empty($stripe_data['charge_id'])) {
+			$processor_id = PaymentProcessor::getStripeProcessorId();
+			if ($processor_id !== null) {
+				$addendum['payment_processor_id'] = $processor_id;
+				// Store Stripe charge ID in invoice_id (keeping trxn_id for our internal tracking)
+				$addendum['invoice_id'] = $stripe_data['charge_id'];
+				Debug::log("Linking Stripe payment processor ID {$processor_id} with charge {$stripe_data['charge_id']}");
+			} else {
+				Debug::log('Stripe integration enabled but no Stripe payment processor found in CiviCRM');
+			}
+		}
+
 		unset($donation['donor info']);
 		unset($donation['meta']);
 		$result = null;

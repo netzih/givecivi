@@ -323,6 +323,31 @@ class Admin {
 			'type' => 'sectionend',
 		];
 
+		// Stripe Integration
+		$settings['civivipgive_stripe_title'] = [
+			'id' => 'civivipgive_stripe_title',
+			'name' => __('Stripe Integration', 'civivip-give'),
+			'desc' => __('Link Stripe donations to CiviCRM Stripe payment processor for advanced features like refunds.', 'civivip-give'),
+			'type' => 'title',
+		];
+
+		$settings['civivipgive_stripe_link'] = [
+			'name' => __('Enable Stripe Processor Linking', 'civivip-give'),
+			'desc' => __('When enabled, Stripe donations will be linked to your CiviCRM Stripe payment processor, allowing you to manage refunds and view transaction details directly in CiviCRM.', 'civivip-give'),
+			'id' => 'civivipgive_stripe_link',
+			'type' => 'radio_inline',
+			'default' => 'disabled',
+			'options' => [
+				'enabled' => __('Enabled', 'civivip-give'),
+				'disabled' => __('Disabled', 'civivip-give'),
+			],
+		];
+
+		$settings['civivipgive_stripe_end'] = [
+			'id' => 'civivipgive_stripe_end',
+			'type' => 'sectionend',
+		];
+
 		// Payment Method Mappings
 		$settings['civivipgive_payment_title'] = [
 			'id' => 'civivipgive_payment_title',

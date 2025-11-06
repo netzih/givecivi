@@ -2,12 +2,12 @@
 /**
  * Plugin Name:     Give CiviCRM Integration
  * Plugin URI:      https://civivip.com/give-civicrm/
- * Description:     Sync Give donations with CiviCRM contributions. Includes billing address sync, payment method mappings, and recurring donations support.
+ * Description:     Sync Give donations with CiviCRM contributions. Includes billing address sync, payment method mappings, recurring donations support, and Stripe payment processor integration.
  * Author:          Wanna Pixel, Inc.
  * Author URI:      https://wapix.co/
  * Text Domain:     civivip-give
  * Domain Path:     /languages
- * Version:         0.5.0
+ * Version:         0.6.0
  *
  * This product is provided "as is, where is" and with all faults. Seller makes no
  * warranties of any kind whatsoever, express, implied, oral, written, or otherwise,
@@ -48,7 +48,7 @@ final class CivivipGive
 	private function constants()
 	{
 		if ( ! defined('CIVIVIPGIVE_VERSION') ) {
-			define('CIVIVIPGIVE_VERSION', '0.5.0');
+			define('CIVIVIPGIVE_VERSION', '0.6.0');
 		}
 		if ( ! defined('CIVIVIPGIVE_FILE') ) {
 			define('CIVIVIPGIVE_FILE', __FILE__);
