@@ -245,6 +245,17 @@ class Admin {
 		</p>
 		</form>
 
+		<script type="text/javascript">
+		jQuery(document).ready(function($) {
+			// Find our settings form and add submit handler to prevent "unsaved changes" warning
+			$('form').has('input[name="civivipgive_save_settings_submit"]').on('submit', function() {
+				// Remove any beforeunload handlers that might show "unsaved changes" dialog
+				$(window).off('beforeunload');
+				window.onbeforeunload = null;
+			});
+		});
+		</script>
+
 		<!-- Manual Sync Card -->
 	    <div class="card" id="civivipgive-sync-card">
 
