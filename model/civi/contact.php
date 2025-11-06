@@ -46,6 +46,7 @@ class Contact {
 		}
 
 		$result = null;
+		$exception_msg = '';
 		try {
 			civicrm_initialize();
 			$result = civicrm_api3(
@@ -54,7 +55,8 @@ class Contact {
 				$donor
 			);
 		} catch (\CiviCRM_API3_Exception $e) {
-			Debug::log($e->getMessage() );	// unreliable
+			$exception_msg = $e->getMessage();
+			Debug::log($exception_msg);
 		}
 		if(is_array($result) && isset($result['id']) ) {
 			// If we created/updated contact and have billing address, store it
@@ -64,7 +66,8 @@ class Contact {
 			return $result['id'];
 		}
 
-		return 'Failed to store'; Debug::err_log('Give CiviCRM failed to store:' . var_export($donor, true) );
+		Debug::err_log('Give CiviCRM failed to store contact for email: ' . ($donor['email'] ?? 'unknown') . ($exception_msg ? ' - Error: ' . $exception_msg : ''));
+		return 'Failed to store';
 	}
 
 	/**

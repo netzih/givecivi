@@ -7,6 +7,7 @@ use CivivipGive\Model\Civi\Recurrence;
 use CivivipGive\Model\Civi\Contribution;
 use CivivipGive\Control\Service\Fix;
 use CivivipGive\Control\Service\Progress;
+use CivivipGive\Model\Service\Debug;
 
 if ( ! defined('ABSPATH') ) { exit; }
 
@@ -87,6 +88,14 @@ class Manual {
 			set_time_limit(300);
 
 			$contact_id = $this->contacts->store($donation['donor info']);
+
+			// Skip this donation if contact creation failed
+			if (!is_numeric($contact_id) || $contact_id <= 0) {
+				Debug::err_log('Failed to create/find contact for donation, skipping contribution. Donor email: ' . ($donation['donor info']['email'] ?? 'unknown'));
+				array_push($this->naughty_list, 'contact_failed');
+				Progress::countDown(1);
+				continue;
+			}
 
 			$recurrence_id = $this->recurrencesStore($donation['meta']['_give_subscription_id'], $contact_id);
 
