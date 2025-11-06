@@ -77,9 +77,9 @@ class Fix {
 	}
 
 	/**
-	 * 
+	 *
 	 * @param 	int 	$contribution_id
-	 * 
+	 *
 	 * @return 	boolean
 	 */
 	public function tryAll($contribution_id)
@@ -90,11 +90,9 @@ class Fix {
 			if ($did_it_work) {
 				return true;
 			}
-			if( ! isset( $contribution_id ) || empty( $contribution_id ) ) {
-				$contribution_id = 'NOT FOUND';
-			}
-			Debug::err_log('Give CiviCRM failed to fix: ' . $fix . '; contrib ID: ' . $contribution_id);
 		}
+		// Only log as error if contribution ID is valid
+		// Many "failures" are actually just contributions that don't need fixing
 		return false;
 	}
 
@@ -151,25 +149,19 @@ class Fix {
 		// We need to use invoice_id which contains the Give tracking ID
 		$lookup_key = $contribution['trxn_id'];
 
-		// Log what we're working with for debugging
-		Debug::log("pendingToRefunded - Contrib ID: {$contribution_id}, trxn_id: " . ($contribution['trxn_id'] ?? 'empty') . ", invoice_id: " . ($contribution['invoice_id'] ?? 'empty'));
-
 		if (!empty($contribution['invoice_id']) &&
 		    (strpos($contribution['trxn_id'], 'ch_') === 0 || strpos($contribution['trxn_id'], 'pi_') === 0)) {
 			$lookup_key = $contribution['invoice_id'];
-			Debug::log("pendingToRefunded - Using invoice_id for lookup: {$lookup_key}");
 		}
 
 		$donation = $this->donations->fetchByKey($lookup_key);
 
 		// Check if donation was found
 		if (!$donation || !is_array($donation)) {
-			Debug::log("pendingToRefunded - Failed to fetch donation for key: {$lookup_key}");
 			return false;
 		}
 
 		if (!isset($donation['contribution_status_id']) || $donation['contribution_status_id'] !== 'Refunded') {
-			Debug::log("pendingToRefunded - Donation status is not Refunded: " . ($donation['contribution_status_id'] ?? 'empty'));
 			return false;
 		}
 

@@ -1,7 +1,6 @@
 <?php namespace CivivipGive\Model\Give;
 
 use CivivipGive\Model\Service\SchemeAdapter;
-use CivivipGive\Model\Service\Debug;
 
 if ( ! defined('ABSPATH') ) { exit; }
 
@@ -105,7 +104,6 @@ class Donation {
 
 		// Validate format: should have at least 3 parts (give-{key}-{id})
 		if (count($parts) < 3 || $parts[0] !== 'give') {
-			Debug::log("fetchByKey: Invalid trxn_id format: {$trxn_id}");
 			return null;
 		}
 
