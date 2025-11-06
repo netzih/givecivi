@@ -111,6 +111,7 @@ class Contribution {
 		unset($donation['donor info']);
 		unset($donation['meta']);
 		$result = null;
+		$exception_msg = '';
 		try {
 			civicrm_initialize();
 			$result = civicrm_api3(
@@ -119,7 +120,9 @@ class Contribution {
 				$donation + $addendum
 			);
 		} catch (\CiviCRM_API3_Exception $e) {
-			Debug::log($e->getMessage() );	// unreliable
+			$exception_msg = $e->getMessage();
+			Debug::log($exception_msg);
+			Debug::err_log('CiviCRM API Exception for trxn_id=' . ($donation['trxn_id'] ?? 'none') . ': ' . $exception_msg);
 		}
 
 		$result_passes_redux = false;
@@ -135,7 +138,7 @@ class Contribution {
 			return "Failed to pass {$result['id']}";
 		}
 
-		Debug::err_log('Give CiviCRM failed to store: trxn_id=' . ($donation['trxn_id'] ?? 'none'));
+		Debug::err_log('Give CiviCRM failed to store: trxn_id=' . ($donation['trxn_id'] ?? 'none') . ($exception_msg ? ' - Error: ' . $exception_msg : ''));
 		return 'Failed to store';
 	}
 
