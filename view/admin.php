@@ -53,8 +53,8 @@ class Admin {
 			wp_die(__('Security check failed', 'civivip-give'));
 		}
 
-		// Check user permissions
-		if (!current_user_can('manage_give_settings')) {
+		// Check user permissions (use administrator since manage_give_settings may not exist)
+		if (!current_user_can('administrator')) {
 			wp_die(__('You do not have permission to save these settings', 'civivip-give'));
 		}
 
@@ -215,7 +215,6 @@ class Admin {
 	    	</h2>
 
 			<!-- form scaffold for jQuery -->
-			<!-- NB the Give tab we're using already includes a form element. -->
 	            <label for="civivipgive-sync-submit">
 	            	<?= __(
             			'Click to manually synchronize Give donations to CiviContribute.',
@@ -225,9 +224,8 @@ class Admin {
                 <input
                 	name="civivipgive-sync-submit" id="civivipgive-sync-submit"
                 	class="button button-primary button-hero"
-                	type="submit" value="<?= __('Sync', 'civivip-give'); ?>"
+                	type="button" value="<?= __('Sync', 'civivip-give'); ?>"
             	>
-            <!-- /form -->
 
 			<!-- progressbar scaffold for jQuery -->
 	        <div id="civivipgive-sync-progressbar" role="progressbar">
@@ -312,25 +310,6 @@ class Admin {
 
 		$settings['civivipgive_payment_end'] = [
 			'id' => 'civivipgive_payment_end',
-			'type' => 'sectionend',
-		];
-
-		// Manual Sync
-		$settings['civivipgive_sync_title'] = [
-			'id' => 'civivipgive_sync_title',
-			'name' => __('Manual Synchronization', 'civivip-give'),
-			'type' => 'title',
-		];
-
-		$settings['civivipgive_sync_button'] = [
-			'name' => __('Sync Now', 'civivip-give'),
-			'desc' => __('Click to manually synchronize all Give donations to CiviCRM.<br><br><button type="button" class="button button-primary" id="civivipgive-sync-submit">Sync Now</button><div id="civivipgive-sync-progressbar" style="margin-top:15px;display:none;"></div>', 'civivip-give'),
-			'id' => 'civivipgive_sync_button',
-			'type' => 'descriptive_text',
-		];
-
-		$settings['civivipgive_sync_end'] = [
-			'id' => 'civivipgive_sync_end',
 			'type' => 'sectionend',
 		];
 
