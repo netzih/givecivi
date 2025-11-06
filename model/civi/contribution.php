@@ -43,10 +43,21 @@ class Contribution {
 	 */
 	public function store(array $donation, $contact_id)
 	{
+		// Extract Stripe data and Give tracking ID from meta before we check anything else
+		$stripe_data = $donation['meta']['_stripe_data'] ?? [];
+		$give_tracking_id = $donation['meta']['_give_tracking_id'] ?? '';
+
+		// Try to fetch existing contribution
 		$result_exists = $this->fetch($donation['trxn_id']);
 
-		// Extract Stripe data from meta before we check anything else
-		$stripe_data = $donation['meta']['_stripe_data'] ?? [];
+		// If not found and this is a Stripe payment, try fetching by Give tracking ID
+		// (handles migration of contributions synced before Stripe integration)
+		if ($result_exists === 'Failed to fetch' && !empty($stripe_data['charge_id']) && !empty($give_tracking_id)) {
+			$result_exists = $this->fetch($give_tracking_id);
+			if ($result_exists !== 'Failed to fetch') {
+				Debug::log("Found existing contribution by Give tracking ID, will update with Stripe data");
+			}
+		}
 
 		if ($result_exists !== 'Failed to fetch') {
 			$result_passes = Fix::testShape($donation, $contact_id, $result_exists);
@@ -57,7 +68,7 @@ class Contribution {
 				if (!empty($stripe_data['charge_id'])) {
 					$processor_id = PaymentProcessor::getStripeProcessorId();
 					if ($processor_id !== null) {
-						// Update existing contribution with Stripe processor data
+						// Update existing contribution with Stripe processor data and transaction IDs
 						try {
 							civicrm_initialize();
 							$update_result = civicrm_api3(
@@ -66,10 +77,11 @@ class Contribution {
 								[
 									'id' => $result_exists['id'],
 									'payment_processor_id' => $processor_id,
-									'invoice_id' => $stripe_data['charge_id'],
+									'trxn_id' => $stripe_data['charge_id'],  // Stripe charge ID for refunds
+									'invoice_id' => $give_tracking_id,  // Keep Give tracking ID
 								]
 							);
-							Debug::log("Updated existing contribution {$result_exists['id']} with Stripe processor ID {$processor_id} and charge {$stripe_data['charge_id']}");
+							Debug::log("Updated existing contribution {$result_exists['id']} with Stripe processor ID {$processor_id} and trxn_id {$stripe_data['charge_id']}");
 						} catch (\CiviCRM_API3_Exception $e) {
 							Debug::log('Error updating existing contribution with Stripe data: ' . $e->getMessage());
 						}
@@ -85,12 +97,11 @@ class Contribution {
 					: ['contact_id' => $contact_id]);
 
 		// Add Stripe payment processor if available for new/updated contributions
+		// (trxn_id and invoice_id already set correctly in schemeadapter.php)
 		if (!empty($stripe_data['charge_id'])) {
 			$processor_id = PaymentProcessor::getStripeProcessorId();
 			if ($processor_id !== null) {
 				$addendum['payment_processor_id'] = $processor_id;
-				// Store Stripe charge ID in invoice_id (keeping trxn_id for our internal tracking)
-				$addendum['invoice_id'] = $stripe_data['charge_id'];
 				Debug::log("Linking Stripe payment processor ID {$processor_id} with charge {$stripe_data['charge_id']}");
 			} else {
 				Debug::log('Stripe integration enabled but no Stripe payment processor found in CiviCRM');

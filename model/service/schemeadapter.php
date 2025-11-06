@@ -80,6 +80,19 @@ class SchemeAdapter {
 			}
 		}
 
+		// Determine transaction ID based on payment gateway
+		// For Stripe: use actual Stripe charge ID for refund capability
+		// For others: use Give internal tracking ID
+		$give_tracking_id = 'give-' . $payment->key . '-' . $payment->ID;
+		$transaction_id = $give_tracking_id;
+		$invoice_id = '';
+
+		if (!empty($stripe_data['charge_id'])) {
+			// Swap: Stripe charge ID becomes trxn_id (for refunds), Give ID goes to invoice_id
+			$transaction_id = $stripe_data['charge_id'];
+			$invoice_id = $give_tracking_id;
+		}
+
 		return [
 			// Donor related
 			'donor info' => [
@@ -96,6 +109,7 @@ class SchemeAdapter {
 			'meta' => [
 				'_give_subscription_id'		=> $payment_meta['subscription_id'] ?? '',
 				'_stripe_data'				=> $stripe_data,	// Stripe processor data
+				'_give_tracking_id'			=> $give_tracking_id,	// Always store Give ID for lookups
 			],
 			// Donation related
 			'cancel_date' 				=> $payment->status_nicename === 'Refunded' ? $payment->post_modified : '',
@@ -109,7 +123,8 @@ class SchemeAdapter {
 			'payment_instrument_id'		=> Interpreter::paymentInstrument($payment_meta['_give_payment_gateway'] ?? 'manual'),
 			'receive_date' 				=> $payment->date,
 			'total_amount' 				=> number_format($payment_meta['_give_payment_total'], 2),
-			'trxn_id' 					=> 'give-' . $payment->key . '-' . $payment->ID,	// NB key alone would not be unique
+			'trxn_id' 					=> $transaction_id,	// Stripe charge ID for Stripe payments, Give tracking ID for others
+			'invoice_id'				=> $invoice_id,	// Give tracking ID for Stripe payments, empty for others
 			// 'contribution_id' is added by the model upon store, if action is update
 			// 'contact_id' is added by the model upon store, if applicable
 		];
