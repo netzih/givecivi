@@ -48,31 +48,48 @@ class Admin {
 	 */
 	public function saveSettings()
 	{
+		// Log that this was called
+		error_log('CiviCRM Integration: saveSettings() method called');
+		error_log('CiviCRM Integration: POST data: ' . print_r($_POST, true));
+
 		// Verify nonce
 		if (!isset($_POST['civivipgive_settings_nonce']) || !wp_verify_nonce($_POST['civivipgive_settings_nonce'], 'civivipgive_save_settings')) {
+			error_log('CiviCRM Integration: Nonce verification failed');
 			wp_die(__('Security check failed', 'civivip-give'));
 		}
 
 		// Check user permissions (use administrator since manage_give_settings may not exist)
 		if (!current_user_can('administrator')) {
+			error_log('CiviCRM Integration: Permission check failed');
 			wp_die(__('You do not have permission to save these settings', 'civivip-give'));
 		}
 
+		error_log('CiviCRM Integration: Passed security checks, saving settings...');
+
 		// Save each setting
 		$settings = $this->addSettings([]);
+		$saved_count = 0;
 		foreach ($settings as $setting) {
 			if (isset($setting['id']) && isset($_POST[$setting['id']])) {
 				$value = sanitize_text_field($_POST[$setting['id']]);
 				give_update_option($setting['id'], $value);
+				$saved_count++;
+				error_log("CiviCRM Integration: Saved {$setting['id']} = {$value}");
 			}
 		}
 
+		error_log("CiviCRM Integration: Saved {$saved_count} settings total");
+
 		// Redirect back to settings page with success message
-		wp_redirect(add_query_arg([
+		$redirect_url = add_query_arg([
 			'page' => 'give-settings',
 			'tab' => 'civivip-give',
 			'settings-updated' => 'true'
-		], admin_url('admin.php')));
+		], admin_url('admin.php'));
+
+		error_log("CiviCRM Integration: Redirecting to: {$redirect_url}");
+
+		wp_redirect($redirect_url);
 		exit;
 	}
 
@@ -114,10 +131,31 @@ class Admin {
 			);
 		}
 
+		// Handle form submission here before any output
+		if (isset($_POST['civivipgive_save_settings_submit']) && isset($_POST['civivipgive_settings_nonce'])) {
+			if (wp_verify_nonce($_POST['civivipgive_settings_nonce'], 'civivipgive_save_settings')) {
+				if (current_user_can('administrator')) {
+					$settings = $this->addSettings([]);
+					foreach ($settings as $setting) {
+						if (isset($setting['id']) && isset($_POST[$setting['id']])) {
+							$value = sanitize_text_field($_POST[$setting['id']]);
+							give_update_option($setting['id'], $value);
+						}
+					}
+					// Show success message
+					?>
+					<div class="notice notice-success is-dismissible">
+						<p><strong><?php echo __('Settings saved successfully.', 'civivip-give'); ?></strong></p>
+					</div>
+					<?php
+				}
+			}
+		}
+
 		// Get settings to render manually
 		$settings = $this->addSettings([]);
 
-		// Display success message if settings were saved
+		// Display success message if redirected from admin_post
 		if (isset($_GET['settings-updated']) && $_GET['settings-updated'] === 'true') {
 			?>
 			<div class="notice notice-success is-dismissible">
@@ -126,10 +164,10 @@ class Admin {
 			<?php
 		}
 
-		// Render settings form
+		// Render settings form - submit to same page
 		?>
-		<form method="post" action="<?php echo admin_url('admin-post.php'); ?>">
-			<input type="hidden" name="action" value="civivipgive_save_settings">
+		<form method="post" action="">
+			<input type="hidden" name="civivipgive_save_settings_submit" value="1">
 			<?php wp_nonce_field('civivipgive_save_settings', 'civivipgive_settings_nonce'); ?>
 			<table class="form-table">
 				<?php
