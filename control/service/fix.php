@@ -70,9 +70,6 @@ class Fix {
 
 		asort($donat); asort($contrib);
 
-		Debug::log('Fix::testShape - $donat:' . PHP_EOL . var_export($donat, true) );
-		Debug::log('Fix::testShape - $contrib:' . PHP_EOL . var_export($contrib, true) );
-
 		return $donat == $contrib;
 	}
 

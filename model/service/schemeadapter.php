@@ -220,6 +220,7 @@ class SchemeAdapter {
 			'receive_date' 				=> date_format(date_create($contrib['receive_date']), 'Y-m-d H:i:s'),
 			'total_amount' 				=> number_format($contrib['total_amount'], 2),
 			'trxn_id' 					=> $contrib['trxn_id'],
+			'invoice_id'				=> $contrib['invoice_id'] ?? '',
 		];
 	}
 
