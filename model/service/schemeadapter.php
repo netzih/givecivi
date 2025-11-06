@@ -313,11 +313,37 @@ class SchemeAdapter {
 
 			// If still not found, try to get from Stripe account settings
 			if (empty($secret_key)) {
-				$account_slug = $payment_meta['_give_stripe_account_slug'] ?? 'default';
-				$account_key = $test_mode ? "give_stripe_{$account_slug}_test_secret_key" : "give_stripe_{$account_slug}_live_secret_key";
-				$secret_key = give_get_option($account_key, '');
-				if (!empty($secret_key)) {
-					Debug::log("Found Stripe API key using account setting: {$account_key}");
+				$account_slug = $payment_meta['_give_stripe_account_slug'] ?? '';
+				Debug::log("Extracted account slug: " . ($account_slug ?: 'empty'));
+
+				if (!empty($account_slug)) {
+					$account_key = $test_mode ? "give_stripe_{$account_slug}_test_secret_key" : "give_stripe_{$account_slug}_live_secret_key";
+					Debug::log("Trying account-specific key: {$account_key}");
+					$secret_key = give_get_option($account_key, '');
+					if (!empty($secret_key)) {
+						Debug::log("Found Stripe API key using account setting: {$account_key}");
+					}
+				}
+			}
+
+			// Last resort: try to find ANY give option with 'stripe' and 'secret' in the name
+			if (empty($secret_key)) {
+				Debug::log("Attempting to find Stripe keys by searching all GiveWP options...");
+				global $wpdb;
+				$mode_suffix = $test_mode ? 'test' : 'live';
+				$query = $wpdb->prepare(
+					"SELECT option_name, option_value FROM {$wpdb->options}
+					WHERE option_name LIKE %s AND option_name LIKE %s
+					AND option_name LIKE %s LIMIT 5",
+					'%give%',
+					'%stripe%',
+					'%' . $mode_suffix . '%'
+				);
+				$results = $wpdb->get_results($query);
+				Debug::log("Found " . count($results) . " potential Stripe option keys:");
+				foreach ($results as $row) {
+					$value_preview = substr($row->option_value, 0, 20) . '...';
+					Debug::log("  - {$row->option_name}: {$value_preview}");
 				}
 			}
 
