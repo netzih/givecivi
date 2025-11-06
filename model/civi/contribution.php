@@ -58,6 +58,7 @@ class Contribution {
 					: ['contact_id' => $contact_id]);
 		unset($donation['donor info']);
 		unset($donation['meta']);
+		$result = null;
 		try {
 			civicrm_initialize();
 			$result = civicrm_api3(
@@ -69,6 +70,7 @@ class Contribution {
 			Debug::log($e->getMessage() );	// unreliable
 		}
 
+		$result_passes_redux = false;
 		if(is_array($result) && isset($result['id']) ) {
 			$result_passes_redux = Fix::testShape($donation, $contact_id, $result);
 		}
@@ -76,7 +78,7 @@ class Contribution {
 			return $result['id'];
 		}
 
-		if ( ! $result_passes_redux) {
+		if ( ! $result_passes_redux && is_array($result) && isset($result['id'])) {
 			return "Failed to pass {$result['id']}"; Debug::err_log('Give CiviCRM failed to pass:' . var_export($result, true) );
 		}
 
@@ -95,6 +97,7 @@ class Contribution {
 	 */
 	protected function fetch($key)
 	{
+		$result = null;
 		try {
 			civicrm_initialize();
 			$result = civicrm_api3(
@@ -112,6 +115,7 @@ class Contribution {
 
 		// Try test-mode records. In CiviCRM, there is no way to search for both
 		// live and test records together.
+		$test_result = null;
 		try {
 			civicrm_initialize();
 			$test_result = civicrm_api3(

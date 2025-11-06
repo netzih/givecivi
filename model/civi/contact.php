@@ -45,6 +45,7 @@ class Contact {
 			return $result_exists;
 		}
 
+		$result = null;
 		try {
 			civicrm_initialize();
 			$result = civicrm_api3(
@@ -83,6 +84,7 @@ class Contact {
 		}
 
 		// Check if billing address already exists for this contact
+		$existing_address = null;
 		try {
 			civicrm_initialize();
 			$existing_address = civicrm_api3(
@@ -104,11 +106,12 @@ class Contact {
 		];
 
 		// If address exists, add ID to update it
-		if (isset($existing_address['id']) && $existing_address['count'] > 0) {
+		if (is_array($existing_address) && isset($existing_address['id']) && $existing_address['count'] > 0) {
 			$address_data['id'] = $existing_address['id'];
 		}
 
 		// Create or update address
+		$result = null;
 		try {
 			civicrm_initialize();
 			$result = civicrm_api3(
@@ -144,7 +147,8 @@ class Contact {
 	 */
 	protected function fetch($donor)
 	{
-		if ($donor['_wp_user_id'] == 0) {	// See NB above. 
+		if ($donor['_wp_user_id'] == 0) {	// See NB above.
+			$result = null;
 			try {
 				civicrm_initialize();
 				$result = civicrm_api3(
@@ -161,6 +165,7 @@ class Contact {
 			}
 		}
 
+		$user = null;
 		try {
 			civicrm_initialize();
 			$user = civicrm_api3(
@@ -177,14 +182,15 @@ class Contact {
 		}
 
 		// NEW FEATURE
-		// 
-		// If we find no related contacts, josh@wapix.co has asked that we attempt to 
+		//
+		// If we find no related contacts, josh@wapix.co has asked that we attempt to
 		// guess if some previously-existing contact is the same person as our donor.
 		// If we think we've guessed right, then we brand the result with our
 		// "external identifier" for future retrieval (using API3, this means re-
 		// creating the contact).
-		
+
 		// Guess, by email && last_name.
+		$guess_user = null;
 		try {
 			civicrm_initialize();
 			$guess_user = civicrm_api3(
