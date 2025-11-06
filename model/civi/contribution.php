@@ -47,15 +47,26 @@ class Contribution {
 		$stripe_data = $donation['meta']['_stripe_data'] ?? [];
 		$give_tracking_id = $donation['meta']['_give_tracking_id'] ?? '';
 
-		// Try to fetch existing contribution
+		// Try multiple strategies to find existing contribution (avoid duplicates)
+		$result_exists = 'Failed to fetch';
+
+		// Strategy 1: Try to fetch by trxn_id (Charge ID for Stripe, Give tracking for others)
 		$result_exists = $this->fetch($donation['trxn_id']);
 
-		// If not found and this is a Stripe payment, try fetching by Give tracking ID
+		// Strategy 2: If not found and this is a Stripe payment, try fetching by Give tracking ID
 		// (handles migration of contributions synced before Stripe integration)
 		if ($result_exists === 'Failed to fetch' && !empty($stripe_data['charge_id']) && !empty($give_tracking_id)) {
 			$result_exists = $this->fetch($give_tracking_id);
 			if ($result_exists !== 'Failed to fetch') {
 				Debug::log("Found existing contribution by Give tracking ID, will update with Stripe data");
+			}
+		}
+
+		// Strategy 3: If still not found and we have an invoice_id, try fetching by that
+		if ($result_exists === 'Failed to fetch' && !empty($donation['invoice_id'])) {
+			$result_exists = $this->fetchByInvoiceId($donation['invoice_id']);
+			if ($result_exists !== 'Failed to fetch') {
+				Debug::log("Found existing contribution by invoice_id");
 			}
 		}
 
@@ -189,5 +200,53 @@ class Contribution {
 		}
 
 		return 'Failed to fetch'; Debug::err_log('Give CiviCRM failed to fetch contribution ' . $key);
+	}
+
+	/**
+	 * Retrieve a CiviContribute record by its invoice ID.
+	 * This helps prevent duplicates when checking Stripe donations.
+	 *
+	 * @since 	0.6.0
+	 *
+	 * @param 	string 	$invoice_id 	CiviCRM invoice_id field
+	 *
+	 * @return 	array|string
+	 */
+	protected function fetchByInvoiceId($invoice_id)
+	{
+		$result = null;
+		try {
+			civicrm_initialize();
+			$result = civicrm_api3(
+				'Contribution',
+				'get',
+				['invoice_id' => $invoice_id]
+			);
+		} catch (\CiviCRM_API3_Exception $e) {
+			Debug::log($e->getMessage());
+		}
+
+		if(is_array($result) && isset($result['id']) ) {
+			return $result;
+		}
+
+		// Try test-mode records
+		$test_result = null;
+		try {
+			civicrm_initialize();
+			$test_result = civicrm_api3(
+				'Contribution',
+				'get',
+				['invoice_id' => $invoice_id, 'contribution_test' => 1]
+			);
+		} catch (\CiviCRM_API3_Exception $e) {
+			Debug::log($e->getMessage());
+		}
+
+		if(is_array($test_result) && isset($test_result['id']) ) {
+			return $test_result;
+		}
+
+		return 'Failed to fetch';
 	}
 }
