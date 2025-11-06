@@ -114,14 +114,6 @@ jQuery(function ($) { 'use strict';
 	 *
 	 * @since: 	1.0
 	 */
-	// Wind up the form.
-	$('#give-mainform').submit(function (e) {	// Hoo boy.
-		e.preventDefault();
-		if (permission) {
-			civivipgiveSyncViaAjaxPost();
-		}
-	});
-
 	// Wind up the button.
 	$('#civivipgive-sync-submit').click(function () {
 		if (permission) {
