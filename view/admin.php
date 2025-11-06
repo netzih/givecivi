@@ -3,6 +3,7 @@
 use CivivipGive\Control\Manual;
 use CivivipGive\Control\Service\Progress;
 use CivivipGive\View\Service\Notice;
+use CivivipGive\Model\Civi\Job;
 
 if ( ! defined('ABSPATH') ) { exit; }
 
@@ -26,6 +27,7 @@ class Admin {
 		add_filter('give_get_settings_civivip-give', [$this, 'addSettings']);
 		add_action('admin_post_civivipgive_save_settings', [$this, 'saveSettings']);
 		add_action('wp_ajax_civivipgive-sync', [$this, 'blastOff']);
+		add_action('wp_ajax_civivipgive-stripe-convert', [$this, 'convertStripePaymentIntents']);
 	}
 
 	/**
@@ -300,6 +302,45 @@ class Admin {
 	        <!-- /progressbar -->
 
 	    </div>
+
+		<!-- Stripe Payment Intent Conversion Card -->
+		<?php
+		$stripe_link = give_get_option('civivipgive_stripe_link', 'disabled');
+		if ($stripe_link === 'enabled') {
+		?>
+	    <div class="card" id="civivipgive-stripe-convert-card">
+
+	        <h2 class="title">
+	        	<?= __('Stripe Payment Intent Conversion', 'civivip-give'); ?>
+	    	</h2>
+
+	        <p>
+	        	<?= __(
+            		'Convert Stripe Payment Intent IDs (pi_xxx) to Charge IDs (ch_xxx) for refund support. This uses CiviCRM\'s Stripe configuration to query the Stripe API.',
+            		'civivip-give'
+            	); ?>
+	        </p>
+
+            <label for="civivipgive-stripe-convert-submit">
+            	<?= __(
+        			'Click to manually convert Payment Intent IDs in existing contributions.',
+        			'civivip-give'
+        		); ?>
+            </label>
+            <input
+            	name="civivipgive-stripe-convert-submit" id="civivipgive-stripe-convert-submit"
+            	class="button button-secondary"
+            	type="button" value="<?= __('Convert Payment Intents', 'civivip-give'); ?>"
+        	>
+
+	        <div id="civivipgive-stripe-convert-result" style="margin-top: 15px; display: none;">
+	            <!-- Results will be displayed here via JavaScript -->
+	        </div>
+
+	    </div>
+		<?php
+		}
+		?>
  		<?php
 	}
 
@@ -607,5 +648,36 @@ class Admin {
 			update_option('civivipgive_firstsync', 0);
 		}
 		wp_die();
+	}
+
+	/**
+	 * Ajax handler for Stripe Payment Intent conversion.
+	 *
+	 * @since 	0.6.0
+	 */
+	public function convertStripePaymentIntents()
+	{
+		// Check permissions
+		if (!current_user_can('administrator')) {
+			wp_send_json_error(['message' => 'You do not have permission to perform this action.']);
+			return;
+		}
+
+		// Run the conversion job
+		$result = Job::convertStripePaymentIntents();
+
+		// Return result
+		if ($result['is_error']) {
+			wp_send_json_error([
+				'message' => $result['error_message'] ?? 'Unknown error occurred'
+			]);
+		} else {
+			wp_send_json_success([
+				'message' => implode(', ', $result['values']),
+				'processed' => $result['processed'],
+				'updated' => $result['updated'],
+				'failed' => $result['failed']
+			]);
+		}
 	}
 }

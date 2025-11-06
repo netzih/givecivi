@@ -139,4 +139,53 @@ jQuery(function ($) { 'use strict';
 			civivipgiveTimer('stop');
 		}
 	});
+
+	// Stripe Payment Intent conversion button
+	$('#civivipgive-stripe-convert-submit').click(function () {
+		var $button = $(this);
+		var $resultDiv = $('#civivipgive-stripe-convert-result');
+
+		// Disable button and show loading state
+		$button.prop('disabled', true).val('Converting...');
+		$resultDiv.html('<p>Converting Payment Intent IDs to Charge IDs...</p>').show();
+
+		// Make Ajax request
+		jQuery.ajax({
+			url: ajaxurl,
+			method: 'POST',
+			data: {
+				action: 'civivipgive-stripe-convert'
+			},
+			success: function (response) {
+				console.log('Stripe conversion response:', response);
+
+				if (response.success) {
+					var message = '<div class="notice notice-success inline">';
+					message += '<p><strong>Conversion completed successfully!</strong></p>';
+					message += '<ul>';
+					message += '<li>Processed: ' + response.data.processed + '</li>';
+					message += '<li>Updated: ' + response.data.updated + '</li>';
+					message += '<li>Failed: ' + response.data.failed + '</li>';
+					message += '</ul></div>';
+					$resultDiv.html(message);
+				} else {
+					var errorMessage = '<div class="notice notice-error inline">';
+					errorMessage += '<p><strong>Conversion failed:</strong> ' + response.data.message + '</p>';
+					errorMessage += '</div>';
+					$resultDiv.html(errorMessage);
+				}
+			},
+			error: function (xhr, status, error) {
+				console.log('Stripe conversion error:', error);
+				var errorMessage = '<div class="notice notice-error inline">';
+				errorMessage += '<p><strong>Network error:</strong> Please try again.</p>';
+				errorMessage += '</div>';
+				$resultDiv.html(errorMessage);
+			},
+			complete: function () {
+				// Re-enable button
+				$button.prop('disabled', false).val('Convert Payment Intents');
+			}
+		});
+	});
 });

@@ -326,35 +326,37 @@ class SchemeAdapter {
 				}
 			}
 
-			// Last resort: try to find ANY option with 'stripe' in the name
+			// Try to get from _give_stripe_get_all_accounts array
 			if (empty($secret_key)) {
-				Debug::log("Attempting to find Stripe keys by searching WordPress options...");
-				global $wpdb;
-
-				// First, search for any option with 'stripe' in the name
-				$query = $wpdb->prepare(
-					"SELECT option_name FROM {$wpdb->options}
-					WHERE option_name LIKE %s
-					ORDER BY option_name LIMIT 20",
-					'%stripe%'
-				);
-				$results = $wpdb->get_results($query);
-				Debug::log("Found " . count($results) . " options with 'stripe' in name:");
-				foreach ($results as $row) {
-					Debug::log("  - {$row->option_name}");
+				$account_slug = $payment_meta['_give_stripe_account_slug'] ?? '';
+				if (empty($account_slug)) {
+					$account_slug = give_get_option('_give_stripe_default_account', '');
 				}
 
-				// Check if settings are stored in give_settings option (common in GiveWP)
-				$give_settings = get_option('give_settings', false);
-				if ($give_settings && is_array($give_settings)) {
-					Debug::log("Checking 'give_settings' array for Stripe keys...");
-					$stripe_keys_in_settings = array_filter(array_keys($give_settings), function($key) {
-						return strpos($key, 'stripe') !== false;
-					});
-					Debug::log("Found " . count($stripe_keys_in_settings) . " stripe-related keys in give_settings:");
-					foreach (array_slice($stripe_keys_in_settings, 0, 20) as $key) {
-						$value_preview = is_string($give_settings[$key]) ? substr($give_settings[$key], 0, 20) . '...' : '[not string]';
-						Debug::log("  - {$key}: {$value_preview}");
+				$all_accounts = give_get_option('_give_stripe_get_all_accounts', []);
+				if (!empty($all_accounts) && is_array($all_accounts) && !empty($account_slug)) {
+					Debug::log("Examining _give_stripe_get_all_accounts structure for account: {$account_slug}");
+
+					// The account slug might be stored as a key or in a nested structure
+					if (isset($all_accounts[$account_slug])) {
+						$account_data = $all_accounts[$account_slug];
+						Debug::log("Found account data in all_accounts array");
+
+						// Try various possible key names for the secret
+						$possible_secret_keys = $test_mode
+							? ['test_secret_key', 'secret_key_test', 'test_secret', 'secret_test']
+							: ['live_secret_key', 'secret_key_live', 'live_secret', 'secret_live', 'secret_key', 'secret'];
+
+						foreach ($possible_secret_keys as $key) {
+							if (isset($account_data[$key]) && !empty($account_data[$key])) {
+								$secret_key = $account_data[$key];
+								Debug::log("Found secret key in account data under key: {$key}");
+								break;
+							}
+						}
+					} else {
+						// Maybe accounts are stored in a different structure, log first few keys
+						Debug::log("Account structure - keys: " . implode(', ', array_slice(array_keys($all_accounts), 0, 5)));
 					}
 				}
 			}
