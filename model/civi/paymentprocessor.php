@@ -41,6 +41,14 @@ class PaymentProcessor {
 			return self::$processor_cache['stripe'];
 		}
 
+		// Check if manual processor ID is specified in settings
+		$manual_id = give_get_option('civivipgive_stripe_processor_id', '');
+		if (!empty($manual_id) && is_numeric($manual_id)) {
+			self::$processor_cache['stripe'] = (int)$manual_id;
+			Debug::log("Using manually specified Stripe processor ID: {$manual_id}");
+			return (int)$manual_id;
+		}
+
 		$processor_id = null;
 
 		try {

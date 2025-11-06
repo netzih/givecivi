@@ -224,6 +224,21 @@ class Admin {
 						</td>
 					</tr>
 					<?php
+				} elseif ($setting['type'] === 'text') {
+					$value = give_get_option($setting['id'], $setting['default']);
+					?>
+					<tr>
+						<th scope="row">
+							<label for="<?php echo esc_attr($setting['id']); ?>"><?php echo esc_html($setting['name']); ?></label>
+						</th>
+						<td>
+							<input type="text" name="<?php echo esc_attr($setting['id']); ?>" id="<?php echo esc_attr($setting['id']); ?>" value="<?php echo esc_attr($value); ?>" class="regular-text">
+							<?php if (!empty($setting['desc'])) { ?>
+								<p class="description"><?php echo $setting['desc']; ?></p>
+							<?php } ?>
+						</td>
+					</tr>
+					<?php
 				} elseif ($setting['type'] === 'descriptive_text') {
 					?>
 					<tr>
@@ -341,6 +356,14 @@ class Admin {
 				'enabled' => __('Enabled', 'civivip-give'),
 				'disabled' => __('Disabled', 'civivip-give'),
 			],
+		];
+
+		$settings['civivipgive_stripe_processor_id'] = [
+			'name' => __('Stripe Payment Processor ID', 'civivip-give'),
+			'desc' => __('Optional: Enter a specific CiviCRM Payment Processor ID. Leave blank to auto-detect the first active Stripe processor. Find this in CiviCRM under Administer → System Settings → Payment Processors.', 'civivip-give'),
+			'id' => 'civivipgive_stripe_processor_id',
+			'type' => 'text',
+			'default' => '',
 		];
 
 		$settings['civivipgive_stripe_end'] = [

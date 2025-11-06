@@ -45,22 +45,46 @@ class Contribution {
 	{
 		$result_exists = $this->fetch($donation['trxn_id']);
 
+		// Extract Stripe data from meta before we check anything else
+		$stripe_data = $donation['meta']['_stripe_data'] ?? [];
+
 		if ($result_exists !== 'Failed to fetch') {
 			$result_passes = Fix::testShape($donation, $contact_id, $result_exists);
+
+			// If contribution exists and passes checks, update it with Stripe data if available
 			if ($result_passes) {
+				// Check if we need to add Stripe processor data to existing contribution
+				if (!empty($stripe_data['charge_id'])) {
+					$processor_id = PaymentProcessor::getStripeProcessorId();
+					if ($processor_id !== null) {
+						// Update existing contribution with Stripe processor data
+						try {
+							civicrm_initialize();
+							$update_result = civicrm_api3(
+								'Contribution',
+								'create',
+								[
+									'id' => $result_exists['id'],
+									'payment_processor_id' => $processor_id,
+									'invoice_id' => $stripe_data['charge_id'],
+								]
+							);
+							Debug::log("Updated existing contribution {$result_exists['id']} with Stripe processor ID {$processor_id} and charge {$stripe_data['charge_id']}");
+						} catch (\CiviCRM_API3_Exception $e) {
+							Debug::log('Error updating existing contribution with Stripe data: ' . $e->getMessage());
+						}
+					}
+				}
 				return $result_exists['id'];
 			}
 			$addendum = ['contribution_id' => $result_exists['id'] ];
 		}
 
-		// Extract Stripe data from meta before unsetting it
-		$stripe_data = $donation['meta']['_stripe_data'] ?? [];
-
 		$addendum = (isset($addendum)
 					? $addendum + ['contact_id' => $contact_id]
 					: ['contact_id' => $contact_id]);
 
-		// Add Stripe payment processor if available
+		// Add Stripe payment processor if available for new/updated contributions
 		if (!empty($stripe_data['charge_id'])) {
 			$processor_id = PaymentProcessor::getStripeProcessorId();
 			if ($processor_id !== null) {
