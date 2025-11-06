@@ -295,13 +295,34 @@ class SchemeAdapter {
 
 		try {
 			// Get Stripe API keys from GiveWP settings
+			// Try multiple possible setting names (varies by GiveWP version and gateway)
 			$test_mode = ($payment_meta['_give_payment_mode'] ?? '') === 'test';
-			$secret_key = $test_mode
-				? give_get_option('stripe_test_secret_key', '')
-				: give_get_option('stripe_live_secret_key', '');
+
+			$possible_key_names = $test_mode
+				? ['stripe_test_secret_key', 'give_stripe_test_secret_key', '_give_stripe_test_secret_key']
+				: ['stripe_live_secret_key', 'give_stripe_live_secret_key', '_give_stripe_live_secret_key'];
+
+			$secret_key = '';
+			foreach ($possible_key_names as $key_name) {
+				$secret_key = give_get_option($key_name, '');
+				if (!empty($secret_key)) {
+					Debug::log("Found Stripe API key using setting: {$key_name}");
+					break;
+				}
+			}
+
+			// If still not found, try to get from Stripe account settings
+			if (empty($secret_key)) {
+				$account_slug = $payment_meta['_give_stripe_account_slug'] ?? 'default';
+				$account_key = $test_mode ? "give_stripe_{$account_slug}_test_secret_key" : "give_stripe_{$account_slug}_live_secret_key";
+				$secret_key = give_get_option($account_key, '');
+				if (!empty($secret_key)) {
+					Debug::log("Found Stripe API key using account setting: {$account_key}");
+				}
+			}
 
 			if (empty($secret_key)) {
-				Debug::log('Stripe API key not found in GiveWP settings');
+				Debug::log('Stripe API key not found in GiveWP settings. Tried: ' . implode(', ', $possible_key_names));
 				return null;
 			}
 
