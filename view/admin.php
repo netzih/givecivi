@@ -24,7 +24,7 @@ class Admin {
 		add_filter('give-settings_tabs_array', [$this, 'addOurTab']);
 		add_action('give-settings_sections_civivip-give_page', [$this, 'displayTabPage']);
 		add_filter('give_get_settings_civivip-give', [$this, 'addSettings']);
-		add_action('admin_init', [$this, 'saveSettings']);
+		add_action('admin_post_civivipgive_save_settings', [$this, 'saveSettings']);
 		add_action('wp_ajax_civivipgive-sync', [$this, 'blastOff']);
 	}
 
@@ -48,33 +48,26 @@ class Admin {
 	 */
 	public function saveSettings()
 	{
-		// Check if we're on the right page
-		if (!isset($_GET['page']) || $_GET['page'] !== 'give-settings') {
-			return;
-		}
-		if (!isset($_GET['tab']) || $_GET['tab'] !== 'civivip-give') {
-			return;
-		}
-
-		// Check if form was submitted
-		if (!isset($_POST['civivipgive_save_settings'])) {
-			return;
-		}
-
 		// Verify nonce
-		if (!isset($_POST['_wpnonce']) || !wp_verify_nonce($_POST['_wpnonce'], 'civivipgive_settings')) {
+		if (!isset($_POST['civivipgive_settings_nonce']) || !wp_verify_nonce($_POST['civivipgive_settings_nonce'], 'civivipgive_save_settings')) {
 			wp_die(__('Security check failed', 'civivip-give'));
+		}
+
+		// Check user permissions
+		if (!current_user_can('manage_give_settings')) {
+			wp_die(__('You do not have permission to save these settings', 'civivip-give'));
 		}
 
 		// Save each setting
 		$settings = $this->addSettings([]);
 		foreach ($settings as $setting) {
 			if (isset($setting['id']) && isset($_POST[$setting['id']])) {
-				give_update_option($setting['id'], sanitize_text_field($_POST[$setting['id']]));
+				$value = sanitize_text_field($_POST[$setting['id']]);
+				give_update_option($setting['id'], $value);
 			}
 		}
 
-		// Redirect with success message
+		// Redirect back to settings page with success message
 		wp_redirect(add_query_arg([
 			'page' => 'give-settings',
 			'tab' => 'civivip-give',
@@ -135,8 +128,9 @@ class Admin {
 
 		// Render settings form
 		?>
-		<form method="post" action="<?php echo admin_url('admin.php?page=give-settings&tab=civivip-give'); ?>">
-			<?php wp_nonce_field('civivipgive_settings'); ?>
+		<form method="post" action="<?php echo admin_url('admin-post.php'); ?>">
+			<input type="hidden" name="action" value="civivipgive_save_settings">
+			<?php wp_nonce_field('civivipgive_save_settings', 'civivipgive_settings_nonce'); ?>
 			<table class="form-table">
 				<?php
 				foreach ($settings as $setting) {
@@ -209,38 +203,40 @@ class Admin {
 		</table>
 
 		<p class="submit">
-			<input type="submit" name="civivipgive_save_settings" class="button button-primary" value="<?php echo esc_attr(__('Save Changes', 'civivip-give')); ?>">
+			<input type="submit" class="button button-primary" value="<?php echo esc_attr(__('Save Changes', 'civivip-give')); ?>">
 		</p>
 		</form>
 
 		<!-- Manual Sync Card -->
-	    <div class="card" id="civivipgive-sync-card" style="margin-top: 20px; padding: 20px;">
+	    <div class="card" id="civivipgive-sync-card">
+
 	        <h2 class="title">
 	        	<?= __('CiviCRM Integration Manual Sync', 'civivip-give'); ?>
 	    	</h2>
 
-	        <p>
-	        	<?= __(
-        			'Click to manually synchronize Give donations to CiviContribute.',
-        			'civivip-give'
-        		); ?>
-	        </p>
-
-            <p>
-	            <input
-	            	name="civivipgive-sync-submit" id="civivipgive-sync-submit"
-	            	class="button button-primary button-hero"
-	            	type="button" value="<?= __('Sync Now', 'civivip-give'); ?>"
-	        	>
-        	</p>
+			<!-- form scaffold for jQuery -->
+			<!-- NB the Give tab we're using already includes a form element. -->
+	            <label for="civivipgive-sync-submit">
+	            	<?= __(
+            			'Click to manually synchronize Give donations to CiviContribute.',
+            			'civivip-give'
+            		); ?>
+	            </label>
+                <input
+                	name="civivipgive-sync-submit" id="civivipgive-sync-submit"
+                	class="button button-primary button-hero"
+                	type="submit" value="<?= __('Sync', 'civivip-give'); ?>"
+            	>
+            <!-- /form -->
 
 			<!-- progressbar scaffold for jQuery -->
-	        <div id="civivipgive-sync-progressbar" role="progressbar" style="margin-top: 20px; height: 30px; border: 1px solid #ccc; background: #f0f0f0; position: relative;">
-	            <div id="progress-label" class="progress-label" style="position: absolute; width: 100%; text-align: center; line-height: 30px; font-weight: bold;">
+	        <div id="civivipgive-sync-progressbar" role="progressbar">
+	            <div id="progress-label" class="progress-label">
 	            	<!-- value supplied by jQuery -->
 	            </div>
 	        </div>
 	        <!-- /progressbar -->
+
 	    </div>
  		<?php
 	}
